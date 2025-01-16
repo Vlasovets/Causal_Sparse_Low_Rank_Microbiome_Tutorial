@@ -1,13 +1,16 @@
 # Causal Sparse Low Rank Microbiome Tutorial
 ![Workflow](docs/workflow.pdf)
 
-This repository contains a tutorial on causal inference using sparse and low-rank methods in microbiome data analysis.
+This repository contains a tutorial for using a randomization-based causal inference framework with sparse+low-rank graphical models in microbiome data analysis.
 
 ## Table of Contents
 - [Introduction](#introduction)
 - [Installation](#installation)
 - [Usage](#usage)
-- [Contributing](#contributing)
+- [License](#license)
+
+## Workflow
+![Workflow](docs/workflow.png)
 - [License](#license)
 
 ## Introduction
@@ -28,4 +31,4 @@ Follow the steps in the tutorial notebooks to learn how to apply causal inferenc
 Contributions are welcome! Please open an issue or submit a pull request if you have any improvements or bug fixes.
 
 ## License
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.    
