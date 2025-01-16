@@ -1,5 +1,5 @@
 # Causal Sparse Low Rank Microbiome Tutorial
-![Workflow](docs/workflow.pdf)
+![Workflow](docs/workflow.png)
 
 This repository contains a tutorial for using a randomization-based causal inference framework with sparse+low-rank graphical models in microbiome data analysis.
 
@@ -7,10 +7,6 @@ This repository contains a tutorial for using a randomization-based causal infer
 - [Introduction](#introduction)
 - [Installation](#installation)
 - [Usage](#usage)
-- [License](#license)
-
-## Workflow
-![Workflow](docs/workflow.png)
 - [License](#license)
 
 ## Introduction
