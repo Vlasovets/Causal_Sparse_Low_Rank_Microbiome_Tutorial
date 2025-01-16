@@ -11,6 +11,11 @@ env/
 # Ignore other directories
 node_modules/
 dist/
+work/
 
 # Ignore utils/__pycache__ directory
-utils/__pycache__/
+utils/__pycache__/.nextflow/
+.nextflow/
+
+# Ignore data directory
+data/
