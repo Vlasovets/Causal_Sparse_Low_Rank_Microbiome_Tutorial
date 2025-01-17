@@ -67,7 +67,7 @@ def main():
         hyperparameters = json.load(f)
 
     target_encoding = {int(k): v for k, v in hyperparameters["target_encoding"].items()}
-    column_thresholds = hyperparameters["column_thresholds"]
+    matching_criteria = hyperparameters["matching_criteria"]
     n_permutations = hyperparameters["n_permutations"]
 
     # Redirect stdout to the log file
@@ -96,7 +96,7 @@ def main():
         thresholds[:] = np.nan
 
         # Set thresholds using the dictionary
-        for column_name, threshold_value in column_thresholds.items():
+        for column_name, threshold_value in matching_criteria.items():
             
             if column_name not in df.columns:
                 continue
