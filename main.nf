@@ -1,6 +1,4 @@
 process pairMatching {
-    container 'ovlasovets/causal_pipeline:latest'
-
     input:
     path data_file
     path hyperparameters_file
