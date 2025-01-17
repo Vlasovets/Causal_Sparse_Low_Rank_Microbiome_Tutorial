@@ -39,7 +39,6 @@ def main():
     
     # Define the flags and expected inputs
     parser.add_argument("-data", required=True, help="Path to the data file (CSV).")
-    parser.add_argument("-var", required=True, help="Target variable name in the dataset.")
     parser.add_argument("-params", required=True, help="Path to the JSON file with hyperparameters.")
     parser.add_argument("-output", required=True, help="Directory to save output files.")
 
@@ -48,7 +47,6 @@ def main():
 
     # Extract arguments
     data_file = args.data
-    target_variable = args.var
     hyperparameters_file = args.params
     output_directory = args.output
 
@@ -66,6 +64,7 @@ def main():
     with open(hyperparameters_file, "r") as f:
         hyperparameters = json.load(f)
 
+    target_variable = hyperparameters["target_variable"]
     target_encoding = {int(k): v for k, v in hyperparameters["target_encoding"].items()}
     matching_criteria = hyperparameters["matching_criteria"]
     n_permutations = hyperparameters["n_permutations"]
