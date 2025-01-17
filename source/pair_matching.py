@@ -19,11 +19,11 @@ def main():
     """
     Main function to perform pair matching and simulated outcome generation.
 
-    This script reads preprocessed data, applies pair matching between treated and control groups
+    This script reads preprocessed covariates, applies pair matching between treated and control groups
     based on the provided hyperparameters, and generates simulated outcomes.
 
     Command-line arguments:
-        -data (str): Path to the data file containing the dataset.
+        -covariates (str): Path to the covariates file containing the dataset.
         -var (str): The target variable name in the dataset.
         -params (str): Path to the file containing hyperparameters for matching.
         -output (str): Directory to save output files.
@@ -38,7 +38,7 @@ def main():
     parser = argparse.ArgumentParser(description="Pair matching and simulated outcome generation script.")
     
     # Define the flags and expected inputs
-    parser.add_argument("-data", required=True, help="Path to the data file (CSV).")
+    parser.add_argument("-covariates", required=True, help="Path to the covariates file (CSV).")
     parser.add_argument("-params", required=True, help="Path to the JSON file with hyperparameters.")
     parser.add_argument("-output", required=True, help="Directory to save output files.")
 
@@ -46,7 +46,7 @@ def main():
     args = parser.parse_args()
 
     # Extract arguments
-    data_file = args.data
+    covariates_file = args.covariates
     hyperparameters_file = args.params
     output_directory = args.output
 
@@ -58,7 +58,7 @@ def main():
         raise FileNotFoundError(f"Hyperparameters file '{hyperparameters_file}' not found.")
 
     # Define log file path
-    log_file_path = os.path.join(output_directory, "log.txt")
+    log_file_path = os.path.join(output_directory, ".log_pairMatching.txt")
 
     # Load hyperparameters from JSON file
     with open(hyperparameters_file, "r") as f:
@@ -75,7 +75,7 @@ def main():
         print(f"Loaded hyperparameters: {hyperparameters}")
 
         # Load dataset
-        df = pd.read_csv(data_file, index_col="u3_16s_id")
+        df = pd.read_csv(covariates_file, index_col="u3_16s_id")
         if target_variable not in df.columns:
             raise ValueError(f"Target variable '{target_variable}' is not in the dataset.")
 
@@ -131,7 +131,7 @@ def main():
 
         # Generate file paths
         simulated_outcomes_file = os.path.join(output_directory, f"W_paired_{target_variable}.csv")
-        matched_df_file = os.path.join(output_directory, "matched_pairs.csv")
+        matched_df_file = os.path.join(output_directory, f"matched_pairs_{target_variable}.csv")
 
         # Save results
         simulated_outcomes.to_csv(simulated_outcomes_file, index=True)
