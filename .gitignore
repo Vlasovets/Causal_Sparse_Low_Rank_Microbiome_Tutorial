@@ -1,6 +1,7 @@
 # Ignore Python bytecode files
 *.pyc
 *.pyo
+*.log*
 __pycache__/
 .ipynb_checkpoints/
 
