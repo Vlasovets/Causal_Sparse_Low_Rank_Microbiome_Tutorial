@@ -5,9 +5,9 @@ import warnings
 from gglasso.solver.ggl_helper import prox_od_1norm, phiplus
 
 
-def ADMM_single(S, lambda1, Omega_0, Theta_0=np.array([]), X_0=np.array([]), r=2,
+def ADMM_single(S, lambda1, Omega_0, Theta_0=np.array([]), X_0=np.array([]),
              rho=1., max_iter=1000, tol=1e-7, rtol=1e-4, stopping_criterion='boyd',\
-             update_rho=True, verbose=False, measure=False, latent=False, mu1=None, lambda1_mask=None):
+             update_rho=True, verbose=False, measure=False, latent=False, mu1=None, r=None, lambda1_mask=None):
     """
     This is an ADMM solver for the (Latent variable) Single Graphical Lasso problem (SGL).
     If ``latent=False``, this function solves
@@ -152,8 +152,10 @@ def ADMM_single(S, lambda1, Omega_0, Theta_0=np.array([]), X_0=np.array([]), r=2
         if latent:
             C_t = Theta_t - X_t - Omega_t
             eigD1, eigQ1 = np.linalg.eigh(C_t)
-            # L_t = prox_rank_norm(C_t, mu1/rho, D=eigD1, Q=eigQ1)
-            L_t = prox_rank_norm(C_t, r, D=eigD1, Q=eigQ1)
+            if r is None:
+                L_t = prox_rank_norm(C_t, mu1=mu1, rho=rho, D=eigD1, Q=eigQ1)
+            else:
+                L_t = prox_rank_norm(C_t, r=r, D=eigD1, Q=eigQ1)
 
         # X Update
         X_t = X_t + Omega_t - Theta_t + L_t
@@ -299,7 +301,7 @@ def ADMM_stopping_criterion(Omega, Omega_t_1, Theta, L, X, S, rho, eps_abs, eps_
     return r,s,e_pri,e_dual
 
 
-def prox_rank_norm(A, r, D = np.array([]), Q = np.array([])):
+def prox_rank_norm(A, r=None, mu1=None, rho=None, D = np.array([]), Q = np.array([])):
 
     if len(D) != A.shape[0]:
         D, Q = np.linalg.eigh(A)
@@ -307,15 +309,9 @@ def prox_rank_norm(A, r, D = np.array([]), Q = np.array([])):
 
     D_desc = D[::-1]  # Descending eigenvalues order
 
-    B = (Q * np.maximum(D-D_desc[r], 0.))@Q.T
+    if r is None:
+        beta = mu1 / rho
+        B = (Q * np.maximum(D-beta, 0.))@Q.T
+    else:
+        B = (Q * np.maximum(D-D_desc[r], 0.))@Q.T
     return B
-
-
-# def prox_rank_norm(A, beta, D = np.array([]), Q = np.array([])):
-
-#     if len(D) != A.shape[0]:
-#         D, Q = np.linalg.eigh(A)
-#         print("Single eigendecomposition is executed in prox_rank_norm")
-    
-#     B = (Q * np.maximum(D-beta, 0.))@Q.T
-#     return B
