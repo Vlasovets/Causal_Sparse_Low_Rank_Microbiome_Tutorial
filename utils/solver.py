@@ -307,11 +307,10 @@ def prox_rank_norm(A, r=None, mu1=None, rho=None, D = np.array([]), Q = np.array
         D, Q = np.linalg.eigh(A)
         print("Single eigendecomposition is executed in prox_rank_norm")
 
-    D_desc = D[::-1]  # Descending eigenvalues order
-
     if r is None:
         beta = mu1 / rho
         B = (Q * np.maximum(D-beta, 0.))@Q.T
     else:
-        B = (Q * np.maximum(D-D_desc[r], 0.))@Q.T
+        beta = D[-(r+1)] ### largest eigenvalue corresponding to rank r
+        B = (Q * np.maximum(D-beta, 0.))@Q.T ### line 78 https://github.com/zdk123/SpiecEasi/blob/lowrank/src/ADMM.cpp#L71
     return B
