@@ -188,7 +188,7 @@ def construct_network(discrepancies, N_treated, N_control):
     pairs_dict = dict()
     N_matched = 0
 
-    for i in range(0, N_treated):
+    for i in range(0, N_treated+1):
         if matching.is_matched(i):
             N_matched += 1
             pairs_dict[N_matched] = [i, matching.match_of(i) - N_treated]
