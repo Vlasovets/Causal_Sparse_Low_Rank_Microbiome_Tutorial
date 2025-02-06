@@ -2,7 +2,8 @@ import numpy as np
 import time
 import warnings
 
-from gglasso.solver.ggl_helper import prox_od_1norm, phiplus
+from gglasso.solver.ggl_helper import phiplus
+from utils.helper import prox_od_1norm
 
 
 def ADMM_single(S, lambda1, Omega_0, Theta_0=np.array([]), X_0=np.array([]),
@@ -146,7 +147,7 @@ def ADMM_single(S, lambda1, Omega_0, Theta_0=np.array([]), X_0=np.array([]),
         Omega_t = phiplus(beta=1 / rho, D=eigD, Q=eigQ)
 
         # Theta Update
-        Theta_t = prox_od_1norm(Omega_t + L_t + X_t, (1 / rho) * lambda1)
+        Theta_t = prox_od_1norm(Omega_t + L_t + X_t, (1 / rho) * lambda1, diag=False)
 
         # L Update
         if latent:
@@ -265,7 +266,7 @@ def kkt_stopping_criterion(Omega, Theta, L, X, S, lambda1, latent=False, mu1=Non
 
     (p, p) = S.shape
 
-    term1 = np.linalg.norm(Theta - prox_od_1norm(Theta + X, l=lambda1)) / (1 + np.linalg.norm(Theta))
+    term1 = np.linalg.norm(Theta - prox_od_1norm(Theta + X, l=lambda1, diag=False)) / (1 + np.linalg.norm(Theta))
 
     term2 = np.linalg.norm(Omega - Theta + L) / (1 + np.linalg.norm(Theta))
 
