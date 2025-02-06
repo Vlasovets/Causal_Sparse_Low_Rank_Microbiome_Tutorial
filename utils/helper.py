@@ -1,11 +1,12 @@
 import pandas as pd
 import numpy as np
+from numba import njit
 import statsmodels.api as sm
 
-import rpy2.robjects as ro
-from rpy2.robjects.packages import importr
-from rpy2.robjects import pandas2ri
-from rpy2.robjects.conversion import localconverter
+import rpy2.robjects as ro # type: ignore
+from rpy2.robjects.packages import importr # type: ignore
+from rpy2.robjects import pandas2ri # type: ignore
+from rpy2.robjects.conversion import localconverter # type: ignore
 
 pandas2ri.activate()
 utils = importr('utils')
@@ -15,8 +16,7 @@ linda = importr("LinDA")
 
 def normalize(X):
     """
-    transforms to the simplex
-    X should be of a pd.DataFrame of form (p, N)
+    transforms to the simplex X should be of a pd.DataFrame of form (p, N)
     """
     return X / X.sum(axis=0)
 
@@ -36,8 +36,7 @@ def geometric_mean(x, positive=False):
 
 def log_transform(X, transformation=str, eps=0.1):
     """
-    log transform, scaled with geometric mean
-    X should be a pd.DataFrame of form (p,N)
+    log transform, scaled with geometric mean X should be a pd.DataFrame of form (p,N)
     """
     if transformation == "clr":
         assert not np.any(X.values == 0), "Add pseudo count before using clr"
@@ -171,7 +170,6 @@ def read_data_from_csv(file_path, sep: str=";", encoding: str='unicode_escape'):
     pandas.DataFrame: A DataFrame containing the data from the CSV file.
     """
     try:
-        # Read the CSV file into a DataFrame using pandas
         data_df = pd.read_csv(file_path, on_bad_lines='skip', encoding=encoding, sep=sep)
         return data_df
     except FileNotFoundError:
@@ -323,9 +321,9 @@ def _flatten_list(d=dict):
     return flat_list
 
 
-def check_samples_overlap(df, asv):
+def check_samples_overlap(df, asv, show_diff=True):
     """
-    Filter and report samples in covariates'df' based on their presence in count data 'asv'.
+    Filter and report samples in covariates DataFrame 'df' based on their presence in count data DataFrame 'asv'.
 
     This function takes two DataFrames, 'df' and 'asv', and performs the following operations:
     1. Converts the index of 'df' to a list of strings.
@@ -336,6 +334,7 @@ def check_samples_overlap(df, asv):
     Parameters:
     - df (pandas.DataFrame): The input DataFrame containing samples.
     - asv (pandas.DataFrame): The DataFrame used for comparison.
+    - show_diff (bool): Whether to print the samples present in 'df' but not in 'asv'. Default is True.
 
     Returns:
     - pandas.DataFrame: The filtered DataFrame after excluding samples not present in 'asv'.
@@ -343,7 +342,7 @@ def check_samples_overlap(df, asv):
     str_id = list(map(str, df.index))
     common_samples = list(set(str_id).intersection(set(asv.columns)))
     diff_samples = list(set(str_id).difference(set(asv.columns)))
-    if diff_samples:
+    if diff_samples and show_diff:
         print(f"Samples that are present in matched pairs, but not in ASVs: {len(diff_samples)}")
         for sample in diff_samples:
             print(sample)
@@ -351,7 +350,7 @@ def check_samples_overlap(df, asv):
     # Exclude samples which are not present in ASVs (if any)
     int_id = list(map(int, common_samples))
     df = df[df.index.isin(int_id)]
-    return df
+    return df, diff_samples
 
 
 
@@ -371,51 +370,20 @@ def filter_by_column(ige, column_name):
     return filtered_ige
 
 
-# def perform_bh_correction_and_filter(taxa, asymptotic_pvalues, taxa_rank):
-#     """
-#     Perform Benjamini-Hochberg correction on p-values and filter significant features.
-
-#     Parameters:
-#     - taxa (pd.DataFrame): DataFrame containing taxonomic information.
-#     - asymptotic_pvalues (dict): Dictionary containing taxonomic levels as keys and asymptotic p-values as values.
-#     - taxa_rank (str): The taxonomic level to analyze.
-
-#     Returns:
-#     - merged_df (pd.DataFrame): DataFrame containing taxonomic information and significant features.
-#     """
-#     # Sample p-values (replace this with your actual p-values)
-#     pvalues = asymptotic_pvalues[taxa_rank]
-
-#     # Create a DataFrame with the p-values
-#     df_pvalues = pd.DataFrame({'name': pvalues.index, 'pvalue': pvalues.values})
-
-#     # Perform Benjamini-Hochberg correction
-#     adjusted_pvalues = sm.stats.multipletests(df_pvalues['pvalue'], method='fdr_bh')[1]
-
-#     # Update the DataFrame with adjusted p-values
-#     df_pvalues['adjusted_pvalue'] = adjusted_pvalues
-
-#     # Display the result
-#     da_species = df_pvalues[df_pvalues['adjusted_pvalue'] <= 0.05]
-
-#     return da_species
-
-
-
 def perform_bh_correction_and_filter(taxa, stats, alpha=0.05):
     """
     Perform Benjamini-Hochberg correction on p-values and filter significant features.
 
     Parameters:
     - taxa (DataFrame): DataFrame containing taxonomic information.
-    - stats (DataFrame): DataFrame containing statistical results with 'asymptotic_pvalues' column.
+    - stats (DataFrame): DataFrame containing statistical results with 'p_value' column.
     - alpha (float, optional): Threshold for significance. Default is 0.05.
 
     Returns:
     - DataFrame: Subset of the input DataFrame containing features with adjusted p-values <= alpha.
     """
     # Perform Benjamini-Hochberg correction
-    adjusted_pvalues = sm.stats.multipletests(stats['asymptotic'], method='fdr_bh')[1]
+    adjusted_pvalues = sm.stats.multipletests(stats['p_value'], method='fdr_bh')[1]
 
     # Update the DataFrame with adjusted p-values
     stats['adjusted_pvalue'] = adjusted_pvalues
@@ -570,6 +538,7 @@ def calculate_unadjusted_p_values(test_stats, obs_stat, test_type):
     return p_value
 
 
+
 def min_unadjusted_p_values(test_stats):
     """
     Calculates the minimum unadjusted p-values for a given set of test statistics.
@@ -627,3 +596,23 @@ def adjusted_p_values(min_p_values, p_value):
         adj_p_values.append(adj)
     
     return adj_p_values
+
+
+@njit() 
+def prox_od_1norm(A, l, diag=True):
+    """
+    calculates the prox of the off-diagonal 1norm at a point A
+
+    diag : bool, optional (default=False)
+    If True, preserves the diagonal elements of A.
+    If False, applies soft-thresholding to all elements.
+
+    """    
+    (d1,d2) = A.shape
+    res = np.sign(A) * np.maximum(np.abs(A) - l, 0.)
+
+    if diag:
+        for i in np.arange(np.minimum(d1,d2)):
+            res[i,i] = A[i,i]
+    
+    return res
