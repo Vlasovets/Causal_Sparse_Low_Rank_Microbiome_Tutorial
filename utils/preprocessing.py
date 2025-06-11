@@ -123,13 +123,14 @@ def filter_and_process_asv_table(ASV_table, freq_threshold):
     freq_sample = pd.DataFrame(freq_sample)
     freq_sample = freq_sample[freq_sample['taxa frequency'] > freq_threshold]
     
-    # Filter ASV table based on >= 0.01 frequencies
+    # Filter ASV table based on count frequencies
     asv_top_samples = ASV_table[ASV_table.index.isin(freq_sample.index)]
     
     # Filter columns with zero mean
     asv_samples_ids = set(asv_top_samples.columns)
     means = asv_top_samples.mean()
     zero_mean_cols = means[means == 0].index
+    print("These columns have not variance and will be dropped: {0}".format(zero_mean_cols))
     
     # Drop columns with zero mean if any
     asv_top_samples = asv_top_samples.drop(zero_mean_cols, axis=1)
@@ -178,7 +179,7 @@ def filter_samples_by_status(w, status):
 
     Parameters:
     - w (pandas.Series): A pandas Series containing status values (0 or 1).
-    - status (str): The status to filter samples by. Should be either "allergy" or "control".
+    - status (str): The status to filter samples by. Should be either "test" or "control".
 
     Returns:
     - list of str: List of sample IDs corresponding to the specified status.
@@ -186,7 +187,7 @@ def filter_samples_by_status(w, status):
     Raises:
     - ValueError: If the provided status is not valid.
     """
-    if "allergy" in status:
+    if "test" in status:
         sample_ids = w[w == 0].index
     elif "control" in status:
         sample_ids = w[w == 1].index
