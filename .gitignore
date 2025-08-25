@@ -13,6 +13,7 @@ env/
 node_modules/
 dist/
 work/
+/notebooks/archive
 
 # Ignore utils/__pycache__ directory
 utils/__pycache__/.nextflow/
