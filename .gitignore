@@ -4,6 +4,7 @@
 *.log*
 __pycache__/
 .ipynb_checkpoints/
+.command.trace
 
 # Ignore virtual environment directories
 venv/
