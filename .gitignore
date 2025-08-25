@@ -21,3 +21,8 @@ utils/__pycache__/.nextflow/
 
 # Ignore data directory
 data/
+
+# Ignore large figures
+plots/svg/
+plots/html/
+plots/pdf/
