@@ -1,0 +1,80 @@
+---
+title: "SLR_SPIEC_EASI"
+output: html_document
+date: "2025-02-14"
+---
+
+
+```{r}
+library(devtools)
+install_github("zdk123/SpiecEasi")
+library(SpiecEasi)
+```
+
+
+### Load Data
+
+```{r}
+### preprocessing of AGP Data has been done with NetComi
+net_W <- readRDS("../design_AG/netcomi_AGP_result.rds")
+```
+
+### Run SLR 
+
+```{r}
+se_0_slr <- spiec.easi(net_W$countMat1, method='slr', r=10, lambda.min.ratio=1e-2, nlambda=20, sel.criterion='stars', beta=0, pulsar.params=list(rep.num=20, ncores=4))
+
+se_1_slr <- spiec.easi(net_W$countMat2, method='slr', r=10, lambda.min.ratio=1e-2, nlambda=20, sel.criterion='stars', beta=0, pulsar.params=list(rep.num=20, ncores=4))
+```
+
+### Check the solution
+
+```{r}
+X <- se_1_slr$est$data
+
+S0_inv <- as.data.frame(as.matrix(se_0_slr$est$icov[[getOptInd(se_0_slr)]]))
+S1_inv <- as.data.frame(as.matrix(se_1_slr$est$icov[[getOptInd(se_0_slr)]]))
+
+L0 <- se_0_slr$est$resid[[getOptInd(se_0_slr)]]
+L1 <- se_1_slr$est$resid[[getOptInd(se_1_slr)]]
+
+rank_L0 <- qr(L0)$rank
+rank_L1 <- qr(L1)$rank
+print(rank_L0)
+print(rank_L1)
+
+print("smoker")
+lambda_range_se_0_slr <- se_0_slr$lambda
+print(lambda_range_se_0_slr)
+print("non-smoker")
+lambda_range_se_1_slr <- se_1_slr$lambda
+print(lambda_range_se_1_slr)
+```
+
+### Save results
+
+```{r}
+write.csv(S0_inv, "../design_AG/theta_smoker.csv", row.names = TRUE)
+write.csv(S1_inv, "../design_AG/theta_non_smoker.csv", row.names = TRUE)
+
+write.csv(L0, "../design_AG/low_rank_smoker.csv", row.names = TRUE)
+write.csv(L1, "../design_AG/low_rank_non_smoker.csv", row.names = TRUE)
+```
+
+### Check eBIC
+
+```{r}
+ebic <- function(refit, data, loglik, gamma = .5) {
+  if (is.null(data) || nrow(data) == 0) {
+    warning("data is NULL or empty")
+    return(NA)
+  }
+  df <- sum(refit) / 2
+  n  <- nrow(data)
+  d  <- ncol(data)
+  -n * loglik + log(n) * df + 4 * gamma * log(d) * df
+}
+
+ebic(se_0_slr$refit$stars, se_0_slr$est$data, se_0_slr$est$loglik[se_0_slr$select$stars$opt.index])
+ebic(se_1_slr$refit$stars, se_1_slr$est$data, se_1_slr$est$loglik[se_1_slr$select$stars$opt.index])
+```

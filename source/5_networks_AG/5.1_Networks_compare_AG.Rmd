@@ -1,0 +1,352 @@
+---
+title: "Network analysis of AGP"
+output: html
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#### install NetCoMi
+devtools::install_github("stefpeschel/NetCoMi",
+                         ref = "develop",
+                         repos = c("https://cloud.r-project.org/",
+                                   BiocManager::repositories()))
+
+devtools::install_github("vmikk/metagMisc")
+devtools::install_github("analyxcompany/ForceAtlas2")
+install.packages("pals")
+
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("limma")
+```
+
+
+
+```{r}
+library(NetCoMi)
+library(metagMisc)
+library(phyloseq)
+library(igraph)
+library(plyr)
+library(ForceAtlas2)
+library(pals)
+library(RColorBrewer)
+library(corrplot)
+library(limma)
+```
+
+### Load data 
+
+```{r}
+## load microbiome data
+load('../design_AG/agdata.rda')
+
+## load sample/matched_data
+load('../design_AG/dat_matched_smoke_ag.RData')
+```
+
+
+
+### Create a phyloseq object 
+
+```{r}
+## order covariates data frame 
+# necessary for NetCoMi analyses 
+matched_df$W <- as.factor(matched_df$W)
+sample_df <- matched_df[order(matched_df$W, matched_df$pair_nb),]
+otu_table(agdata) <- otu_table(agdata)[,rownames(sample_df)]
+
+ps <- phyloseq(otu_table(agdata),
+               sample_data(sample_df),
+               tax_table(agdata))
+ps
+```
+
+```{r}
+## locate and remove the species that are totally absent in the matched data
+empty_species <- rowSums(otu_table(ps))
+length(which(empty_species == 0))
+
+ps_prune <- prune_taxa(empty_species != 0, ps)
+```
+```{r}
+## agglomerate to Family ##
+ps_Fam <- tax_glom(ps_prune, taxrank = "Family", NArm = FALSE)
+vec_taxa_Fam <- apply(otu_table(ps_Fam), 1, function(x) sum(x > 0, na.rm = TRUE))
+table(vec_taxa_Fam)
+ps_Fam_prune <- prune_taxa(vec_taxa_Fam >= 0, ps_Fam)
+ps_Fam_prune
+```
+
+
+```{r}
+ps <- ps_Fam_prune
+
+# check order of matching
+cols <- c("sex", "pair_nb", "W")
+tail(sample_data(ps)[,cols])
+```
+
+```{r}
+gut_split <- metagMisc::phyloseq_sep_variable(ps, "W")
+
+gut_split$`0`
+```
+
+
+### NetComi
+
+```{r}
+net_W <- netConstruct(gut_split$`0`, gut_split$`1`, verbose = 2,
+                           filtTax = "highestVar",
+                           filtTaxPar = list(highestVar = 50),
+                           measure = "spieceasi",
+                           measurePar = list(method = "glasso",
+                                             nlambda=20,
+                                             pulsar.params=list(rep.num=20)),
+                           normMethod = "none", zeroMethod = "none",
+                           sparsMethod = "none", seed = 123456, 
+                           matchDesign = c(1,1),
+                           jointPrepro = FALSE )
+
+```
+
+```{r}
+# saveRDS(net_W, file = "../design_AG/netcomi_AGP_result.rds")
+```
+
+
+```{r}
+phylo_0 <- gut_split$`0`
+phylo_1 <- gut_split$`1`
+
+# Now filter the data for smokers (W == 0) and non-smokers (W == 1)
+filtered_data_smoker <- matched_df[matched_df$W == 0, cols]
+filtered_data_non_smoker <- matched_df[matched_df$W == 1, cols]
+
+# # Save Sample Data
+write.csv(filtered_data_smoker,
+          "../design_AG/sample_data_smoker.csv", row.names = TRUE)
+write.csv(filtered_data_non_smoker,
+          "../design_AG/sample_data_non_smoker.csv", row.names = TRUE)
+
+# Save OTU tables
+write.csv(as.data.frame(net_W$countMat1),
+          "../design_AG/otu_table_smoker.csv", row.names = TRUE)
+write.csv(as.data.frame(net_W$countMat2),
+          "../design_AG/otu_table_non_smoker.csv", row.names = TRUE)
+
+# Save Taxonomy Tables
+write.csv(as.data.frame(tax_table(phylo_0)),
+          "../design_AG/tax_table_smoker.csv", row.names = TRUE)
+write.csv(as.data.frame(tax_table(phylo_1)),
+          "../design_AG/tax_table_non_smoker.csv", row.names = TRUE)
+
+```
+
+
+```{r}
+props_W <- netAnalyze(net_W, clustMethod = "cluster_fast_greedy",
+                      connectivity = FALSE,
+                      avDissIgnoreInf = TRUE,
+                      weightClustCoef = FALSE )
+```
+
+```{r}
+plot(props_W, sameLayout = TRUE, layoutGroup = 1,
+     nodeSize = "eigenvector", cexNodes = 1.5, cexLabels = 1.8,
+     groupNames = c("Non-Smokers", "Daily Smokers"),
+     hubBorderCol  = "gray40")
+```
+
+
+
+### SPIEC-EASI
+
+```{r}
+library(SpiecEasi)
+
+# se_0 <- spiec.easi(net_W$countMat1, method='glasso', lambda.min.ratio=1e-2, 
+#                  nlambda=20, pulsar.params=list(rep.num=20))
+
+se_1 <- spiec.easi(net_W$countMat2, method='glasso', lambda.min.ratio=1e-2, 
+                 nlambda=20, pulsar.params=list(rep.num=20))
+```
+
+```{r}
+
+### get instability (D-b) statistics
+stars_summary <- se_1$select$stars$summary
+lambda_values <- se_1$lambda
+
+# Printing the variables
+print("Stars Instability values (D_N):")
+print(stars_summary)
+
+print("Lambda Path:")
+print(lambda_values)
+
+
+### opt stability selected
+# getStability(se_1)
+
+# Save the object 'se_1' to an .rds file
+# saveRDS(se_1, file = "../design_AG/se_non_smokers.rds")
+
+# for (i in seq_along(se_1$est$icov)) {
+#   write.csv(se_1$est$icov[[i]], paste0("../design_AG/sub_icov_", i, ".csv"), row.names = FALSE)
+# }
+
+```
+
+
+```{r}
+### Smoker solution
+lambda_range_se_0 <- se_0$lambda
+opt_lambda_se_0 <- getOptLambda(se_0)
+cov_matrix_se_0 <- as.data.frame(as.matrix(getOptCov(se_0)))
+inv_cov_matrix_se_0 <- as.data.frame(as.matrix(getOptiCov(se_0)))
+
+print(lambda_range_se_0)
+print(opt_lambda_se_0)
+print(cov_matrix_se_0)
+print(inv_cov_matrix_se_0)
+```
+
+```{r}
+### Non-smoker solution
+lambda_range_se_1 <- se_1$lambda
+opt_lambda_se_1 <- getOptLambda(se_1)
+cov_matrix_se_1 <- as.data.frame(as.matrix(getOptCov(se_1)))
+inv_cov_matrix_se_1 <- as.data.frame(as.matrix(getOptiCov(se_1)))
+SP <- se_1$est$sparsity
+
+print(lambda_range_se_1)
+print(opt_lambda_se_1)
+print(SP)
+print(cov_matrix_se_1)
+print(inv_cov_matrix_se_1)
+```
+
+
+
+```{r}
+# # Save covaraince matrices
+write.csv(cov_matrix_se_0,
+          "../design_AG/cov_smoker.csv", row.names = TRUE)
+write.csv(cov_matrix_se_1,
+          "../design_AG/cov_non_smoker.csv", row.names = TRUE)
+
+write.csv(inv_cov_matrix_se_0,
+          "../design_AG/icov_smoker.csv", row.names = TRUE)
+write.csv(inv_cov_matrix_se_1,
+          "../design_AG/icov_non_smoker.csv", row.names = TRUE)
+```
+
+
+### SGL SE
+
+
+```{r}
+library(devtools)
+install_github("zdk123/SpiecEasi")
+library(SpiecEasi)
+```
+
+```{r}
+net_W <- readRDS("../design_AG/netcomi_AGP_result.rds")
+
+# se_1 <- spiec.easi(net_W$countMat2, method='glasso', lambda.min.ratio=1e-2, nlambda=2, pulsar.params=list(rep.num=20))
+```
+
+
+### SLR SE
+
+```{r}
+se_0_slr <- spiec.easi(net_W$countMat1, method='slr', r=10, lambda.min.ratio=1e-2, nlambda=20, sel.criterion='stars', beta=0, pulsar.params=list(rep.num=20, ncores=4))
+
+se_1_slr <- spiec.easi(net_W$countMat2, method='slr', r=10, lambda.min.ratio=1e-2, nlambda=20, sel.criterion='stars', beta=0, pulsar.params=list(rep.num=20, ncores=4))
+```
+
+```{r}
+ebic <- function(refit, data, loglik, gamma = .5) {
+  if (is.null(data) || nrow(data) == 0) {
+    warning("data is NULL or empty")
+    return(NA)
+  }
+  df <- sum(refit) / 2
+  n  <- nrow(data)
+  d  <- ncol(data)
+  -n * loglik + log(n) * df + 4 * gamma * log(d) * df
+}
+
+
+# se_1_slr$ebic <- sapply(se_1_slr, function(x)
+#                         ebic(x$refit$stars, x$est$data,
+#                              x$est$loglik[x$select$stars$opt.index]))
+ebic(se_0_slr$refit$stars, se_0_slr$est$data, se_0_slr$est$loglik[se_0_slr$select$stars$opt.index])
+ebic(se_1_slr$refit$stars, se_1_slr$est$data, se_1_slr$est$loglik[se_1_slr$select$stars$opt.index])
+
+```
+
+```{r}
+se_0_slr$est
+```
+
+
+
+```{r}
+X <- se_1_slr$est$data
+
+S0_inv <- as.data.frame(as.matrix(se_0_slr$est$icov[[getOptInd(se_0_slr)]]))
+S1_inv <- as.data.frame(as.matrix(se_1_slr$est$icov[[getOptInd(se_0_slr)]]))
+
+L0 <- se_0_slr$est$resid[[getOptInd(se_0_slr)]]
+L1 <- se_1_slr$est$resid[[getOptInd(se_1_slr)]]
+
+rank_L0 <- qr(L0)$rank
+rank_L1 <- qr(L1)$rank
+print(rank_L0)
+print(rank_L1)
+
+print("smoker")
+lambda_range_se_0_slr <- se_0_slr$lambda
+print(lambda_range_se_0_slr)
+print("non-smoker")
+lambda_range_se_1_slr <- se_1_slr$lambda
+print(lambda_range_se_1_slr)
+# pca <- robustPCA(X, L)
+```
+
+
+```{r}
+write.csv(S0_inv, "../design_AG/theta_smoker.csv", row.names = TRUE)
+write.csv(S1_inv, "../design_AG/theta_non_smoker.csv", row.names = TRUE)
+
+write.csv(L0, "../design_AG/low_rank_smoker.csv", row.names = TRUE)
+write.csv(L1, "../design_AG/low_rank_non_smoker.csv", row.names = TRUE)
+```
+
+
+```{r}
+se_1_slr$lambda
+```
+
+
+
+```{r}
+### Non-smoker solution
+lambda_range_se_1_slr <- se_1_slr$lambda
+opt_lambda_se_1_slr <- getOptLambda(se_1_slr)
+# opt_beta <- getOptBeta(se_1_slr)
+
+print(lambda_range_se_1_slr)
+print(opt_lambda_se_1_slr)
+# print(opt_beta)
+
+```
+
