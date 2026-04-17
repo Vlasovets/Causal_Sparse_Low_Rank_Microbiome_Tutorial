@@ -6,6 +6,9 @@ This repository contains a tutorial for using a randomization-based causal infer
 ## Table of Contents
 - [Introduction](#introduction)
 - [Installation](#installation)
+- [Pair-matching](#pair_matching)
+- [Differential abundance](#da)
+- [Network analysis](#network_analysis)
 - [Usage](#usage)
 - [License](#license)
 
@@ -19,6 +22,12 @@ git clone https://github.com/yourusername/Causal_Sparse_Low_Rank_Microbiome_Tuto
 cd Causal_Sparse_Low_Rank_Microbiome_Tutorial
 pip install -r requirements.txt
 ```
+
+## Pair-matching
+
+## Differential abundance
+
+## Network analysis
 
 ## Usage
 Follow the steps in the tutorial notebooks to learn how to apply causal inference methods to microbiome data. The notebooks are located in the `notebooks` directory.

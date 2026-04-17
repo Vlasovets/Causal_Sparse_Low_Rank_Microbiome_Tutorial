@@ -1,0 +1,3 @@
+cause,fix,case,frob_before,frob_after,delta
+ALL FIXES combined,cumulative (§2–§6),smoker,0.5995,0.2479,0.3516
+ALL FIXES combined,cumulative (§2–§6),non_smoker,0.561,0.5258,0.0352

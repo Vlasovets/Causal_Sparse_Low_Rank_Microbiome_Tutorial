@@ -68,6 +68,8 @@ def ADMM_single(S, lambda1, Omega_0, Theta_0=np.array([]), X_0=np.array([]),
         The default is ``False``.
     mu1 : float, positive, optional
         low-rank regularization parameter. Only needs to be specified if ``latent=True``.
+    r : int, positive, optional
+        Rank constraint for the low-rank component L_t. If specified, L_t is updated to have at most rank r instead of using nuclear norm regularization. Default is None.
     lambda1_mask : array (p,p), non-negative, symmetric, optional
         A mask for the regularization parameter. If specified, the problem is solved with the element-wise regularization strength ``lambda1 * lambda1_mask``.
         
