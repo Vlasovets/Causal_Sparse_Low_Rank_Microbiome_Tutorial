@@ -1,0 +1,2 @@
+lambda_star,opt_index,beta,rep_num,lambda_max,lambda_min,refit_status,subsample_source
+0.706548131615755,1,0.05,20,0.900336610313242,0.0090033661031324,optimal,R_exported

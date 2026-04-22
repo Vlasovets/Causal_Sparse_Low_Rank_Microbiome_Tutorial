@@ -1,0 +1,3 @@
+method,diagonal_penalized_in_estimator,note
+SPIEC-EASI_glasso,True,huge applies lambda*||Theta||_1 over all entries including diagonal. Verified: diag=False in ADMM_single reproduces SE precision to machine precision.
+GGLasso_custom_ADMM,True,"utils/solver.py uses prox_od_1norm(..., diag=False), matching SE's full L1 penalty."
