@@ -1,0 +1,2 @@
+lambda_match,rank_L_match,edges_match,frob_err_theta,frob_err_L,frob_err_combined,max_Db_ratio,shrink_diag
+True,True,False,0.015144258975118802,0.17555469290360917,0.03587893886386151,2.388888888888883,False

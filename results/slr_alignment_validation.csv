@@ -1,0 +1,2 @@
+lambda_match,py_lambda_star,se_lambda_star,edges_match,py_nonzero_opt,se_nonzero_opt,rank_L_py,rank_L_se,frob_theta,frob_L,frob_omega,max_Db_ratio,max_abs_diff_Db,subsample_source
+True,0.670841328012343,0.670841328012343,False,30,34,5,5,0.015144258975118802,0.17555469290360917,0.03587893886386151,2.388888888888883,0.043756410256410305,R_exported
