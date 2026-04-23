@@ -1,0 +1,2 @@
+lambda_match,rank_L_match,edges_match,frob_err_theta,frob_err_L,frob_err_combined,opt_index_fix4,lambda_cor_star,lambda_cov_equiv,lambda_max_cor,lambda_max_cov,grids_match_SE,fix4_equiv_fix2,rank_L,nnz_opt
+False,True,False,0.15298683315237696,0.35103912786996744,0.14881833286783683,7,0.16502996399604342,0.854836323661999,0.9003366103132431,4.66364058612369,False,True,5,36

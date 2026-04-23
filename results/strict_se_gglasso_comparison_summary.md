@@ -378,7 +378,7 @@ Key SE ADMM parameters (from `SpiecEasi:::ADMM` source):
 - `over_relax_par = 1.6` — over-relaxation not present in Python ADMM
 - `mu = p = 40` (initial penalty, equivalent to Python's rho)
 - `maxiter = 100` (via `admm2` opts), `tol = 0.001` (first λ), `tol = 1.0` (warm-start subsequent λ)
-- `shrinkDiag = TRUE` — scaling S to correlation inside the C++ solver; tested and reverted (see below)
+- `shrinkDiag = TRUE` — scaling S to correlation inside the C++ solver; Python replication tested three ways (Fix 1, Fix 2, Fix 3) — all degraded performance; see shrinkDiag sections below
 
 #### Note on opt_index off-by-one (fixed 2026-04-22)
 
@@ -553,16 +553,129 @@ Fix 2 is worse than the baseline on every metric. frob_err_theta increases from 
 
 **Why Fix 2 fails**: the λ rescaling by `scale = λ_max_cor / λ_max_cov ≈ 0.193` introduces an anisotropic effective penalty on the original Θ_cov of `λ_cov × scale × d_i × d_j`. This is 5× smaller than SE's actual effective penalty (`λ_cov × d_i × d_j`, without the scale factor), so Fix 2 under-regularises relative to SE in the original domain. The baseline (uniform λ_cov on S_cov) is equivalent to Fix 1 but numerically better-conditioned, and happens to give results closest to SE's 3-block ADMM output.
 
-**Summary of all approaches tested:**
+**Summary of all approaches tested (updated after Fix 4):**
 
-| Approach | frob_theta | frob_L | frob_Ω | λ match |
-|----------|-----------|--------|--------|---------|
-| Baseline: S_cov, uniform λ | **1.5%** | **17.6%** | **3.6%** | ✓ |
-| Fix 1: S_cor, λ/outer(d,d) mask | 4.9% | 27.5% | 6.0% | ✓ |
-| Fix 2: S_cor, rescaled λ × scale | 15.3% | 35.1% | 14.9% | ✗ |
-| SE approach (S_cor, λ_cov uniform) | 42.8% | 52.9% | — | — |
+| Approach | frob_theta | frob_L | frob_Ω | λ match | StARS idx |
+|----------|-----------|--------|--------|---------|-----------|
+| Baseline: S_cov, uniform λ | **1.5%** | **17.6%** | **3.6%** | ✓ (idx 8) | 8 |
+| Fix 1: S_cor, λ/outer(d,d) mask | 4.9% | 27.5% | 6.0% | ✓ (idx 8) | 8 |
+| Fix 2: S_cor, rescaled λ × scale | 15.3% | 35.1% | 14.9% | ✗ (idx 7) | 7 |
+| Fix 3: S_cor, λ_cov uniform (SE actual) | 16.0% | 35.6% | — | ✗ (idx 14) | 14 |
+| Fix 4: S_cor, native-cor λ (≡ Fix 2) | 15.3% | 35.1% | 14.9% | ✗ (idx 7) | 7 |
 
 The **17.6% frob_L in the baseline is the irreducible residual** attributable to the different ADMM formulations (3-block over-relaxation in SE vs 2-block Boyd in Python). No coordinate transform or lambda rescaling bridges this gap.
+
+---
+
+### Native Correlation-Scale Lambda Grid — Fix 4 (2026-04-23)
+
+#### Motivation
+
+After Fix 3 disproved replicating SE's exact shrinkDiag behaviour (original λ_cov on S_cor causes over-regularisation, StARS selects wrong index), Christian's follow-up suggestion is to **build the lambda grid natively on the correlation scale from the start**: `λ_max = max|off-diag(S_cor)| ≈ 0.900`, 20 log-spaced values down to `λ_max × 0.01 ≈ 0.009`. This is framed as the lambda grid SE would use if it truly operated natively on S_cor rather than on S_cov.
+
+The critical diagnostic question: does SE's exported lambda grid match this native-cor grid? If yes, Christian's model is correct and Fix 4 should replicate SE exactly. If no, SE builds its grid from a different `λ_max`.
+
+#### Lambda grid diagnostic
+
+```
+lambda_max_cov (SE's grid source) = 4.663641
+lambda_max_cor (Fix 4 grid source) = 0.900337
+scale_factor = lambda_max_cor / lambda_max_cov = 0.193054
+
+SE exported grid (first 3 of 20): 4.6636, 3.6598, 2.8721, ...
+Fix 4 native-cor grid (first 3):   0.9003, 0.7065, 0.5545, ...
+Grids match SE grid: False
+```
+
+**SE's exported grid is built from `lambda_max_cov = 4.664`, not from `lambda_max_cor = 0.900`.** Christian's premise that SE uses the correlation-scale λ_max does not hold — SE's lambda grid for SLR is calibrated to the covariance scale.
+
+#### Mathematical equivalence with Fix 2
+
+Fix 4's native-cor grid = `geomspace(lambda_max_cor, lambda_max_cor × 0.01, 20)`. Fix 2's rescaled grid = `lambda_grid_cov × scale_factor = geomspace(lambda_max_cov, lambda_max_cov × 0.01, 20) × scale_factor = geomspace(lambda_max_cor, lambda_max_cor × 0.01, 20)`. They are identical — **Fix 4 ≡ Fix 2 mathematically**. The run below confirms this numerically.
+
+#### Implementation
+
+Fix 4 reuses `_stars_slr_cor()` from Fix 2, with the lambda grid computed from `lambda_max_cor` directly instead of importing from R. See [analysis/run_slr_comparison.py](analysis/run_slr_comparison.py) (`FIX 4` block, after the Fix 2 block).
+
+#### Results (from [results/slr_fix4_validation.csv](results/slr_fix4_validation.csv), job 35489398)
+
+| Check | Baseline | Fix 2 | Fix 4 (native-cor) | SE target |
+|-------|----------|-------|--------------------|-----------|
+| `frob_err_theta` | **1.5%** | 15.3% | **15.3%** | 0% |
+| `frob_err_L` | **17.6%** | 35.1% | **35.1%** | 0% |
+| `frob_err_combined` | **3.6%** | 14.9% | **14.9%** | 0% |
+| `grids_match_SE` | N/A | False | **False** | True would mean SE uses cor-scale grid |
+| `fix4_equiv_fix2` | N/A | N/A | **True** | — |
+| `opt_index` | 8 | 7 | **7** | 8 |
+| `lambda_max` used | cov = 4.664 | cor × scale | cor = 0.900 | — |
+
+Fix 4 and Fix 2 produce identical results to 4 decimal places, confirming mathematical equivalence. `grids_match_SE = False` and `fix4_equiv_fix2 = True` are both confirmed numerically.
+
+#### Conclusion
+
+Fix 4 is **mathematically identical to Fix 2** and produced the same results: frob_theta = 15.3%, frob_L = 35.1%, StARS selects index 7 instead of 8. The central finding from this diagnostic is that **SE does not build its lambda grid from `lambda_max_cor`** — it uses `lambda_max_cov = 4.664`. Building the grid natively from `lambda_max_cor` is not a new approach: it is algebraically the same rescaling Fix 2 already tested.
+
+The lambda scale for SE's SLR pipeline is: build grid from `lambda_max_cov`, pass original cov-scale lambdas to C++ ADMM, which internally converts to S_cor and applies those same values (Fix 3). This combination is not replicable in 2-block Python ADMM without producing the wrong lambda selection.
+
+---
+
+### SE's Actual shrinkDiag Behavior — Fix 3 (2026-04-23) — Hypothesis Tested and Disproved
+
+#### Background
+
+After Fix 2 was found to be worse, Christian (Slack) asked: "And then [SE's ADMM] backtransforms with the shrunk diagonal?" The question was whether SE's C++ ADMM literally:
+
+1. Converts `S_cov → S_cor = D⁻¹ S_cov D⁻¹` internally.
+2. Runs ADMM with the **original unscaled λ_cov** values on S_cor.
+3. Back-transforms: `Θ_out = D⁻¹ Θ_cor D⁻¹`.
+
+**Answer from source code: yes.** SPIEC-EASI's `_SpiecEasi_ADMM` C++ function receives S_cov, computes `D = diag(sqrt(diag(S)))`, forms `S_cor = D⁻¹ S D⁻¹`, calls the internal ADMM solver with the same unscaled λ_cov, and back-transforms the result before returning. This is what Fix 3 replicates in Python.
+
+#### Implementation (inline test, not saved to disk)
+
+Fix 3 = full StARS sweep on S_cor (correlation matrix) using the **original unscaled λ_cov grid** (not rescaled as in Fix 2). Per subsample: `S_sub_cor = cov(X_sub) / outer(d_sub, d_sub)`. Full-data fit: `ADMM_single(S_cor, lambda_cov[i], latent=True, r=5)`. Back-transform: `Θ_cov = D⁻¹ Θ_cor D⁻¹`, same for L and Ω.
+
+The key difference from Fix 2:
+
+| | Fix 2 | Fix 3 (SE actual) |
+|---|---|---|
+| Lambda on S_cor | `lambda_cov × scale ≈ lambda_cov × 0.193` | `lambda_cov` (unchanged) |
+| Effective λ on Θ_cov | `lambda_cov × scale × d_i × d_j` (5× under-regularized) | `lambda_cov × d_i × d_j` (SE's actual effective penalty) |
+
+#### Results (inline computation)
+
+Fix 3 path summary (selected rows):
+
+| idx | λ_cov | D_b (Fix 3) | frob_theta | frob_L | NNZ |
+|-----|-------|-------------|-----------|--------|-----|
+| 0 | 4.6636 | 0.0000 | 0.864 | 0.931 | 0 |
+| 8 | 0.6708 | 0.0000 | 0.428 | 0.529 | 0 ← SE selects here |
+| 14 | 0.1567 | **0.0387** | 0.160 | 0.356 | 38 ← Fix 3 StARS selects |
+| 15 | 0.1230 | 0.1078 | — | — | — |
+
+Fix 3 StARS selects **index 14** (λ_cov = 0.1567), not index 8 (λ_cov = 0.671).
+
+At the selected index 14: frob_theta = **16.0%**, frob_L = **35.6%** — worse than baseline on every metric.
+
+#### Root cause
+
+λ_max_cov ≈ 4.664, λ_max_cor ≈ 0.900. At SE's selected lambda (λ_cov = 0.671), the effective regularization strength on S_cor is:
+
+```
+λ_cov / λ_max_cor = 0.671 / 0.900 = 74.5% of λ_max_cor
+```
+
+At 74.5% of λ_max_cor, nearly all off-diagonal entries of S_cor are shrunk to zero → D_b ≈ 0 across all 20 subsamples → instability stays at 0.000 for indices 0–13. StARS cannot select index 8 because the problem is over-regularized from the perspective of S_cor. The threshold β = 0.05 is not crossed until index 14, where λ_cov = 0.157 ≈ 17.4% of λ_max_cor.
+
+**The 5× scale mismatch between the covariance and correlation matrix dominates.** SE's C++ ADMM does apply `shrinkDiag=TRUE` internally and does back-transform the result, but the key is that SE's 3-block ADMM formulation (`over_relax_par=1.6`, `μ=p=40`) somehow converges to a numerically different fixed point than Python's 2-block Boyd ADMM running the same objective. Replicating the coordinate transform in Python (Fix 3) causes StARS to select a completely wrong lambda, making things far worse.
+
+#### Disposition
+
+Fix 3 is **disproved**: it selects lambda index 14 instead of 8 and degrades all Frobenius metrics. The baseline (2-block Boyd ADMM on S_cov with uniform λ_cov) remains the best Python match to SE's output despite not replicating the internal shrinkDiag coordinate transform.
+
+**The `shrinkDiag=TRUE` behavior is specific to SE's 3-block ADMM formulation** and cannot be replicated by a coordinate transform in a 2-block solver — the different algorithmic structure means the two solvers traverse different numerical trajectories even with identical input matrices and lambda values.
+
+**For communication to Christian/Oleg**: Yes, SE's C++ ADMM operates on the correlation matrix and back-transforms. But when Python replicates this (Fix 3), StARS selects index 14 instead of index 8, because λ_cov ≈ 74.5% of λ_max_cor on the correlation scale, causing D_b = 0 across all subsamples until index 14. The baseline (2-block Boyd on S_cov) remains the closest achievable match.
 
 ---
 
@@ -576,7 +689,7 @@ The **17.6% frob_L in the baseline is the irreducible residual** attributable to
 | Python solver | `ADMM_single(latent=False)` | `ADMM_single(latent=True, r=5)` |
 | L variable | Not present (L=0) | Positive semidefinite, rank ≤ 5 |
 | `diag` in prox | `diag=False` (full L1 including diagonal) | `diag=False` (same) |
-| `shrinkDiag` | Handled by `huge` (cor input ≡ unit diagonal) | C++ ADMM internal; Python replication tested and reverted — see shrinkDiag Investigation section |
+| `shrinkDiag` | Handled by `huge` (cor input ≡ unit diagonal) | C++ ADMM internal; Python replication tested three ways (Fix 1, Fix 2, Fix 3) — all worse than baseline; see shrinkDiag Investigation sections |
 | ADMM structure | 2-block Boyd (Python) / `huge` (R) | 3-block SpiecEasi C++ (over_relax=1.6, μ=p) vs 2-block Python |
 
 **Residual error interpretation**: frob_theta=1.5% and frob_omega=3.6% are due to different ADMM formulations (3-block over-relaxation vs 2-block), not a data or lambda bug. frob_L=17.6% is irreducible — both solvers converge to their respective fixed points for the ill-conditioned nuclear-norm subproblem. Lambda selection is unaffected: both select index 8 (λ=0.670841).
