@@ -1,0 +1,2 @@
+lambda_match,rank_L_match,edges_match,frob_err_theta,frob_err_L,frob_err_combined,max_Db_ratio,shrink_diag_source,lambda_cor_star,lambda_cov_equiv,scale_factor
+False,True,False,0.1529868331523786,0.3510391278699694,0.1488183328678382,2.388888888888883,R_exported_d,0.165029963996043,0.854836323661999,0.193054458997575

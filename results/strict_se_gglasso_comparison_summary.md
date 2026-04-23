@@ -475,6 +475,97 @@ SE's actual `shrinkDiag=TRUE` in C++ uses a different (3-block) ADMM formulation
 
 ---
 
+### shrinkDiag Emulation Fix (Fix 2, 2026-04-23)
+
+#### Motivation
+
+The shrinkDiag investigation (Fix 1) disproved the naive coordinate-transform approach — the problem was that the lambda grid was calibrated to the covariance scale but applied to the correlation matrix. Fix 2 implements the corrected three-step procedure suggested by Christian:
+
+1. Export SE's exact internal `d` vector (`d = sqrt(diag(cov(X_clr)))`) from R.
+2. Solve on the correlation matrix `S_cor = D⁻¹ S_cov D⁻¹` using a **lambda grid rescaled to correlation scale**: `lambda_cor = lambda_cov × (λ_max_cor / λ_max_cov)` where λ_max_cor = max|off-diag(S_cor)| ≈ 0.900 and λ_max_cov ≈ 4.664, so scale ≈ 0.193.
+3. Post-multiply the result back to the original covariance scale: `Θ = D⁻¹ Θ_cor D⁻¹`, same for L and Ω.
+
+Per-subsample fits also use `S_sub_cor = cov2cor(cov(X_sub))` so that the StARS stability is computed consistently on the correlation scale.
+
+#### New R exports (from [analysis/run_spieceasi_slr_step1.R](analysis/run_spieceasi_slr_step1.R))
+
+- [results/slr_shrinkdiag_d_vector.csv](results/slr_shrinkdiag_d_vector.csv) — 40-element `d` vector
+- [results/slr_lambda_grid_cor_scale.csv](results/slr_lambda_grid_cor_scale.csv) — paired cov-scale / cor-scale lambda grids with scale factor
+
+#### Mathematical relationship between Fix 1 and Fix 2
+
+Both fix approaches solve on S_cor = D⁻¹ S_cov D⁻¹ and back-transform with D⁻¹ Θ_cor D⁻¹. The only difference is the lambda:
+
+| Approach | Lambda applied to S_cor | Effective λ on original Θ_cov |
+|---|---|---|
+| Fix 1 (disproved) | `lambda_cov / outer(d,d)` (lambda1_mask) | `lambda_cov` (uniform, same as baseline) |
+| **Fix 2** | `lambda_cov × scale` (uniform on S_cor) | `lambda_cov × scale × d_i × d_j` (anisotropic) |
+| SE (shrinkDiag=TRUE, actual) | `lambda_cov` (uniform on S_cor) | `lambda_cov × d_i × d_j` (anisotropic, 1/scale larger) |
+
+Fix 2's effective penalty is anisotropic (high-variance pairs penalised more), but 5× smaller than SE's actual effective penalty. The baseline (uniform λ on S_cov) remains the closest match mathematically to SE's output.
+
+#### Results (from [results/slr_fix2_validation.csv](results/slr_fix2_validation.csv))
+
+| Check | Baseline | Fix 1 (shrink_diag=True) | Fix 2 (cor scale + rescaled λ) |
+|-------|----------|--------------------------|-------------------------------|
+| `frob_err_theta` | **1.5%** | 4.9% | 15.3% |
+| `frob_err_L` | **17.6%** | 27.5% | 35.1% |
+| `frob_err_combined` | **3.6%** | 6.0% | 14.9% |
+| `edges_match` | False (34 vs 30) | False (34 vs 40) | False (34 vs 36) |
+| `lambda_match` | **True** (idx 8) | True (idx 8) | False (idx 7, λ_cov_equiv=0.855) |
+| `max_Db_ratio` | 2.39× | 3.63× | 2.39× |
+
+#### Figures
+
+**Fix 2 vs SE reference — low-rank component L**
+
+![SE L (reference)](figures/slr_se_lowrank_L_heatmap.png)
+
+![Python L — baseline](figures/slr_py_lowrank_L_heatmap.png)
+
+![Python L — Fix 2](figures/slr_fix2_python_lowrank_L_heatmap.png)
+
+**Fix 2 vs SE reference — sparse component Θ**
+
+![SE Θ (reference)](figures/slr_se_precision_theta_heatmap.png)
+
+![Python Θ — baseline](figures/slr_py_precision_theta_heatmap.png)
+
+![Python Θ — Fix 2](figures/slr_fix2_python_precision_theta_heatmap.png)
+
+**Fix 2 vs SE reference — combined Ω = Θ − L**
+
+![SE Ω (reference)](figures/slr_se_omega_heatmap.png)
+
+![Python Ω — baseline](figures/slr_py_omega_heatmap.png)
+
+![Python Ω — Fix 2](figures/slr_fix2_python_omega_heatmap.png)
+
+**Instability and sparsity paths (Fix 2)**
+
+![D_b path Fix 2](figures/slr_fix2_db_path_comparison.png)
+
+![Sparsity path Fix 2](figures/slr_fix2_sparsity_path_comparison.png)
+
+#### Conclusion
+
+Fix 2 is worse than the baseline on every metric. frob_err_theta increases from 1.5% → 15.3%, frob_err_L from 17.6% → 35.1%, and frob_err_combined from 3.6% → 14.9%. Fix 2 also loses lambda alignment: StARS on the rescaled correlation grid selects index 7 (λ_cov_equiv = 0.855) instead of the correct index 8 (λ = 0.671).
+
+**Why Fix 2 fails**: the λ rescaling by `scale = λ_max_cor / λ_max_cov ≈ 0.193` introduces an anisotropic effective penalty on the original Θ_cov of `λ_cov × scale × d_i × d_j`. This is 5× smaller than SE's actual effective penalty (`λ_cov × d_i × d_j`, without the scale factor), so Fix 2 under-regularises relative to SE in the original domain. The baseline (uniform λ_cov on S_cov) is equivalent to Fix 1 but numerically better-conditioned, and happens to give results closest to SE's 3-block ADMM output.
+
+**Summary of all approaches tested:**
+
+| Approach | frob_theta | frob_L | frob_Ω | λ match |
+|----------|-----------|--------|--------|---------|
+| Baseline: S_cov, uniform λ | **1.5%** | **17.6%** | **3.6%** | ✓ |
+| Fix 1: S_cor, λ/outer(d,d) mask | 4.9% | 27.5% | 6.0% | ✓ |
+| Fix 2: S_cor, rescaled λ × scale | 15.3% | 35.1% | 14.9% | ✗ |
+| SE approach (S_cor, λ_cov uniform) | 42.8% | 52.9% | — | — |
+
+The **17.6% frob_L in the baseline is the irreducible residual** attributable to the different ADMM formulations (3-block over-relaxation in SE vs 2-block Boyd in Python). No coordinate transform or lambda rescaling bridges this gap.
+
+---
+
 ### Known Differences: SLR vs GLasso
 
 | Aspect | GLasso | SLR |
