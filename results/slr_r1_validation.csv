@@ -1,0 +1,2 @@
+lambda_match_r1,py_lambda_r1,se_lambda_r1,py_opt_index_r1,se_opt_index_r1,cosine_similarity,frob_L_r1,sigma_se,sigma_py,sigma_rel_diff
+True,1.08929654411291,1.08929654411291,6,6,0.999990060002647,0.016772674230528986,0.268347414336431,0.2641713426075045,0.015562183594177945
