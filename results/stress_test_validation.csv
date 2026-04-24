@@ -1,0 +1,2 @@
+frob_theta_rand,frob_L_rand,frob_theta_real,frob_L_real,lambda_stress,rank_L_rand_py,rank_L_rand_se,p,solver_py,solver_se
+0.06319210268367133,4.332847445312471,0.015144258975118802,0.17555469290360917,0.670841328012343,5,5,40,"ADMM_single (2-block Boyd, utils/solver.py)",admm2 via SpiecEasi:::admm2 (3-block over-relaxed C++)

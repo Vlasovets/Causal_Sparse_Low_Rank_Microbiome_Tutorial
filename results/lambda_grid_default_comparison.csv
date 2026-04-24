@@ -1,0 +1,8 @@
+property,SE_SLR,Python_SLR,gglasso_SGL
+input_matrix,cov(X_clr),cov(X_clr) [shared],user-supplied S
+lambda_max,4.663641,4.663641,max|off-diag(S)|
+lambda_min_ratio,0.01,0.01,user-defined
+nlambda,20,20,user-defined
+grids_match,—,True,—
+solver_type,3-block C++ ADMM,2-block Boyd (ADMM_single),2-block Boyd (ADMM_SGL)
+SE_GLasso_lmax,—,—,0.900337 [for GLasso]
