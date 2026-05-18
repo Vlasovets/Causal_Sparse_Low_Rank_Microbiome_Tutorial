@@ -1,17 +1,32 @@
+import os
 import pandas as pd
 import numpy as np
-from numba import njit
+try:
+    from numba import njit
+except Exception:
+    # Fallback when numba is unavailable/incompatible; keep functions usable.
+    def njit(*jit_args, **jit_kwargs):
+        if jit_args and callable(jit_args[0]) and len(jit_args) == 1 and not jit_kwargs:
+            return jit_args[0]
+
+        def _decorator(func):
+            return func
+
+        return _decorator
 import statsmodels.api as sm
 
-import rpy2.robjects as ro # type: ignore
-from rpy2.robjects.packages import importr # type: ignore
-from rpy2.robjects import pandas2ri # type: ignore
-from rpy2.robjects.conversion import localconverter # type: ignore
-
-pandas2ri.activate()
-utils = importr('utils')
-devtools = importr('devtools')
-linda = importr("LinDA")
+if os.environ.get("USE_RPY2", "0") == "1":
+    import rpy2.robjects as ro # type: ignore
+    from rpy2.robjects.packages import importr # type: ignore
+    from rpy2.robjects import pandas2ri # type: ignore
+    from rpy2.robjects.conversion import localconverter # type: ignore
+    try:
+        pandas2ri.activate()
+    except DeprecationWarning:
+        pass
+    utils = importr('utils')
+    devtools = importr('devtools')
+    linda = importr("LinDA")
 
 
 def normalize(X):

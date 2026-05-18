@@ -2,13 +2,20 @@ import numpy as np
 import time
 import warnings
 
-from gglasso.solver.ggl_helper import phiplus
+try:
+    from gglasso.solver.ggl_helper import phiplus
+except Exception:
+    # Fallback when gglasso's numba dependency is unavailable/incompatible.
+    def phiplus(beta, D, Q):
+        d = (D + np.sqrt(D**2 + 4.0 * beta)) / 2.0
+        return (Q * d) @ Q.T
 from utils.helper import prox_od_1norm
 
 
 def ADMM_single(S, lambda1, Omega_0, Theta_0=np.array([]), X_0=np.array([]),
              rho=1., max_iter=1000, tol=1e-7, rtol=1e-4, stopping_criterion='boyd',\
-             update_rho=True, verbose=False, measure=False, latent=False, mu1=None, r=None, lambda1_mask=None):
+             update_rho=True, verbose=False, measure=False, latent=False, mu1=None, r=None, lambda1_mask=None,
+             shrink_diag=False):
     """
     This is an ADMM solver for the (Latent variable) Single Graphical Lasso problem (SGL).
     If ``latent=False``, this function solves
@@ -86,7 +93,19 @@ def ADMM_single(S, lambda1, Omega_0, Theta_0=np.array([]), X_0=np.array([]),
     (p, p) = S.shape
     
     assert lambda1 > 0 , "lambda1 should be positive, otherwise using Graphical Lasso is redundant. Specify entries with zero regularization using lambda1_mask."
-    
+
+    # Diagonal rescaling (shrinkDiag=TRUE in SE's C++ ADMM).
+    # Rescales S to correlation form: S_ij / sqrt(S_ii * S_jj).
+    # Applies entry-wise effective lambda: lambda / (d_i * d_j).
+    # GLasso path: SE exports a correlation matrix (unit diagonal), so this is a no-op there.
+    _shrink_scale = None
+    if shrink_diag:
+        _shrink_d = np.sqrt(np.diag(S).clip(1e-12))
+        _shrink_scale = np.outer(_shrink_d, _shrink_d)
+        S = S / _shrink_scale
+        _mask = 1.0 / _shrink_scale
+        lambda1_mask = _mask if lambda1_mask is None else lambda1_mask * _mask
+
     # use lambda1_mask if specified
     if lambda1_mask is not None:
         assert lambda1_mask.shape == (p,p), f"lambda1_mask needs to be of shape (p,p), but is {lambda1_mask.shape}."
@@ -224,6 +243,13 @@ def ADMM_single(S, lambda1, Omega_0, Theta_0=np.array([]), X_0=np.array([]),
             status = 'max iterations reached'
 
     print(f"ADMM terminated after {iter_t+1} iterations with status: {status}.")
+
+    # Back-transform from correlation scale to original scale.
+    if _shrink_scale is not None:
+        Omega_t = Omega_t / _shrink_scale
+        Theta_t = Theta_t / _shrink_scale
+        if latent:
+            L_t = L_t / _shrink_scale
 
     ### CHECK FOR SYMMETRY
     if abs((Omega_t).T - Omega_t).max() > 1e-5:
