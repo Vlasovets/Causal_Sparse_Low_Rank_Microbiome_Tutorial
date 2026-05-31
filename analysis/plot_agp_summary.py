@@ -197,14 +197,12 @@ save(fig, "agp_volcano_combined")
 # ═══════════════════════════════════════════════════════════════════════════════
 print("\n=== 4. Venn diagrams ===")
 
-# ── KORA known results (from Chapter 5 thesis) ───────────────────────────────
+# ── KORA known results (from Chapter 5 thesis, tab:family_bh_lee_main) ───────
 kora_stabsel = {"Bifidobacteriaceae", "Christensenellaceae", "Erysipelotrichaceae"}
-# From tab:family_bh_lee_main — families with BH q < 0.1
-kora_bh  = {"f__Izemoplasmatales", "f__Clostridia_vadinBB60_group",
-            "f__UCG-010", "f__Christensenellaceae", "f__Erysipelatoclostridiaceae",
-            "f__Erysipelotrichaceae"}
-# From tab:family_bh_lee_main — families with Lee et al. q < 0.1
-kora_lee = {"f__Izemoplasmatales", "f__Clostridia_vadinBB60_group", "f__UCG-010"}
+# BH q < 0.1: only Izemoplasmatales (q=0.080); all others are q>0.1
+kora_bh  = {"f__Izemoplasmatales"}
+# Lee et al. q < 0.1: only Izemoplasmatales (q=0.073); Clostridia q=0.141, UCG q=0.141
+kora_lee = {"f__Izemoplasmatales"}
 
 # ── AGP results ───────────────────────────────────────────────────────────────
 agp_stabsel = set(classif.loc[classif["selected"], "family"])
