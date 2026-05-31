@@ -129,7 +129,7 @@ for i in range(N_PERM):
         r_w_perm = ro.conversion.py2rpy(w_perm)
     lo_p     = linda.linda(r_otu, r_w_perm, formula="~w",
                            alpha=ALPHA, prev_cut=0.0, lib_cut=1)
-    out_p    = r_to_pandas(lo_p.rx2("output"))["w"]
+    out_p    = r_to_pandas(lo_p.rx2("output").rx2("w"))
     perm_stats = np.hstack([perm_stats,
                              out_p["stat"].reindex(results.index).values.reshape(-1, 1)])
 
