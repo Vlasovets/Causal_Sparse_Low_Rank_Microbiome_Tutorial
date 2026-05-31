@@ -63,6 +63,8 @@ print(f"Combined metadata:  {meta.shape}")
 
 # Transpose: OTUs (rows) x samples (columns) — required by breakaway/DivNet
 otu_T = otu.T.astype(int)
+# Rename rows from numeric OTU IDs to family names (DivNet requires named rows)
+otu_T.index = [family_map.get(str(c), str(c)) for c in otu_T.index]
 print(f"Transposed OTU table: {otu_T.shape}  (OTUs x samples)")
 
 # ── Richness via Breakaway + betta ────────────────────────────────────────────
@@ -110,9 +112,9 @@ print(f"Richness plot saved.")
 # ── Shannon via DivNet + betta ────────────────────────────────────────────────
 print("\n=== DivNet Shannon estimation ===")
 
-# Base taxon: most prevalent OTU (highest sum across samples)
-base_taxon = otu_T.sum(axis=1).idxmax()
-print(f"Base OTU for DivNet: {base_taxon}")
+# Base taxon: most prevalent family (highest total count across samples)
+base_taxon = str(otu_T.sum(axis=1).idxmax())
+print(f"Base taxon for DivNet: {base_taxon}")
 
 with localconverter(ro.default_converter + pandas2ri.converter):
     r_otu_div = ro.conversion.py2rpy(otu_T)
