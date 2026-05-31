@@ -43,10 +43,14 @@ breakaway = importr("breakaway")
 divnet    = importr("DivNet")
 
 # ── Load data ─────────────────────────────────────────────────────────────────
-otu_sm = pd.read_csv(os.path.join(DATA_DIR, "otu_table_smoker.csv"),    index_col=0)
-otu_ns = pd.read_csv(os.path.join(DATA_DIR, "otu_table_non_smoker.csv"), index_col=0)
-meta_sm = pd.read_csv(os.path.join(DATA_DIR, "sample_data_smoker.csv"),    index_col=0)
+otu_sm  = pd.read_csv(os.path.join(DATA_DIR, "otu_table_smoker.csv"),     index_col=0)
+otu_ns  = pd.read_csv(os.path.join(DATA_DIR, "otu_table_non_smoker.csv"), index_col=0)
+meta_sm = pd.read_csv(os.path.join(DATA_DIR, "sample_data_smoker.csv"),   index_col=0)
 meta_ns = pd.read_csv(os.path.join(DATA_DIR, "sample_data_non_smoker.csv"), index_col=0)
+tax_sm  = pd.read_csv(os.path.join(DATA_DIR, "tax_table_smoker.csv"),     index_col=0)
+
+family_map = {str(idx): (fam if pd.notna(fam) else f"f__unknown_{idx}")
+              for idx, fam in tax_sm["Family"].items()}
 
 # Smoking indicator: 1 = smoker, 0 = never-smoker
 meta_sm["W"]     = 1
