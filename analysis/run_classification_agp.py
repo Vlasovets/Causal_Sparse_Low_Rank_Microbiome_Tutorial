@@ -202,8 +202,8 @@ else:
                        showarrow=False, font=dict(size=14))
 
 # MCR annotation
-mcr_cv_val  = float(mcr_table[mcr_table["method"]=="CV"]["MCR_out"])
-mcr_sel_val = float(mcr_table[mcr_table["method"]=="StabSel"]["MCR_out"])
+mcr_cv_val  = float(mcr_table[mcr_table["method"]=="CV"]["MCR_out"].iloc[0])
+mcr_sel_val = float(mcr_table[mcr_table["method"]=="StabSel"]["MCR_out"].iloc[0])
 fig.add_annotation(
     text=(f"Out-of-sample MCR<br>"
           f"CV: {mcr_cv_val:.3f} | StabSel: {mcr_sel_val:.3f}"),
