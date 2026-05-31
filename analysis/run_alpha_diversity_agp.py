@@ -132,8 +132,11 @@ shannon = dv[0]
 div_dict = {}
 for i in range(len(shannon)):
     sid = str(shannon.names[i])
-    div_dict[sid] = (round(float(shannon[i][0]), 4),
-                     round(float(shannon[i][1]), 4))
+    # shannon[i] is an R list; each element is a FloatVector → index with [0]
+    est = shannon[i][0]
+    err = shannon[i][1]
+    div_dict[sid] = (round(float(est[0] if hasattr(est, '__len__') else est), 4),
+                     round(float(err[0] if hasattr(err, '__len__') else err), 4))
 
 div_df = pd.DataFrame.from_dict(div_dict, orient="index", columns=["estimate", "error"])
 div_df.to_csv(os.path.join(OUT_DIR, "divnet_shannon.csv"))
