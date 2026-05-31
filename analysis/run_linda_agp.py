@@ -32,10 +32,14 @@ import rpy2.robjects.pandas2ri as pandas2ri
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
 
-from utils.helper import (r_to_pandas,
-                           calculate_unadjusted_p_values,
+from utils.helper import (calculate_unadjusted_p_values,
                            min_unadjusted_p_values,
                            adjusted_p_values)
+
+def r_to_pandas(r_dataframe):
+    """Convert R DataFrame to pandas — inline to avoid helper.py import issue."""
+    with localconverter(ro.default_converter + pandas2ri.converter):
+        return ro.conversion.rpy2py(r_dataframe)
 
 # ── Config ────────────────────────────────────────────────────────────────────
 DATA_DIR = os.path.join(REPO_ROOT, "source", "design_AG")
