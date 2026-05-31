@@ -116,15 +116,16 @@ print(f"Richness plot saved.")
 # ── Shannon via DivNet + betta ────────────────────────────────────────────────
 print("\n=== DivNet Shannon estimation ===")
 
-# Base taxon: most prevalent family (highest total count across samples)
-base_taxon = str(otu_T.sum(axis=1).idxmax())
+# DivNet expects samples x taxa (W where columns = taxa, rows = samples)
+otu_div = otu_T.T   # back to samples x families
+base_taxon = str(otu_div.sum(axis=0).idxmax())   # most prevalent column (family)
 print(f"Base taxon for DivNet: {base_taxon}")
 
 with localconverter(ro.default_converter + pandas2ri.converter):
-    r_otu_div = ro.conversion.py2rpy(otu_T)
-# Explicitly set row names in R so DivNet can find the base taxon
-r_otu_div.rownames = ro.StrVector(otu_T.index.tolist())
-print(f"R matrix rownames (first 3): {list(r_otu_div.rownames)[:3]}")
+    r_otu_div = ro.conversion.py2rpy(otu_div)
+# Set column names (taxa) explicitly so DivNet can find the base taxon
+r_otu_div.colnames = ro.StrVector(otu_div.columns.tolist())
+print(f"R matrix colnames (first 3): {list(r_otu_div.colnames)[:3]}")
 dv = divnet.divnet(r_otu_div, base=base_taxon, ncores=4)
 
 shannon = dv[0]
