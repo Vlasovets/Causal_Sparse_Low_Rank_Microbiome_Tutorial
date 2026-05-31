@@ -1,6 +1,6 @@
 term,coef
-intercept,0.0
-Peptostreptococcaceae,0.14115900643381404
-Planococcaceae,0.0
-Pasteurellaceae,0.0
-Bifidobacteriaceae,0.0
+intercept,0.14115900643381404
+Bifidobacteriaceae,0.10464953208785666
+Planococcaceae,0.11166293056743797
+Pasteurellaceae,-0.07038163841719382
+Peptostreptococcaceae,-0.14593082423810094
