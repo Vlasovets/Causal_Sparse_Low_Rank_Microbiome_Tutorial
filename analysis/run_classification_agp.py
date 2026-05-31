@@ -129,18 +129,30 @@ print(mcr_table.to_string(index=False))
 mcr_table.to_csv(os.path.join(OUT_DIR, "classification_agp_results.csv"), index=False)
 
 # ── Stability-selected families ───────────────────────────────────────────────
-stab_probs = sol.StabSel.distribution   # selection probabilities per lambda
-# Take max probability across lambda path for each feature
-if stab_probs is not None and len(stab_probs.shape) == 2:
-    max_probs = stab_probs.max(axis=0)
-else:
-    max_probs = np.zeros(len(family_names))
+n_feat = len(family_names)
 
-selected_mask = sol.StabSel.selected_param
+# selected_param / distribution may include intercept as first entry
+selected_mask = np.array(sol.StabSel.selected_param)
+if len(selected_mask) == n_feat + 1:   # intercept prepended → drop it
+    selected_mask = selected_mask[1:]
+
+stab_probs = sol.StabSel.distribution
+if stab_probs is not None:
+    probs_arr = np.array(stab_probs)
+    if probs_arr.ndim == 2:
+        max_probs = probs_arr.max(axis=0)
+    else:
+        max_probs = probs_arr
+    if len(max_probs) == n_feat + 1:
+        max_probs = max_probs[1:]
+    max_probs = max_probs[:n_feat]
+else:
+    max_probs = np.zeros(n_feat)
+
 sel_df = pd.DataFrame({
     "family":    family_names,
     "stab_prob": max_probs,
-    "selected":  selected_mask,
+    "selected":  selected_mask[:n_feat],
 }).sort_values("stab_prob", ascending=False)
 
 print(f"\nStability-selected families (threshold={STABSEL_THRESH}):")
