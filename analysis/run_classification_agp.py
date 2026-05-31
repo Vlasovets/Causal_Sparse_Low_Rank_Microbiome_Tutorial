@@ -214,12 +214,21 @@ C_NOSEL = "#5C4B8A"   # purple  — Selected False
 C_COEF  = "#2C3E6B"   # navy    — refit coefficients
 THRESH  = STABSEL_THRESH
 
-# Panel (a): original feature order (matches panel b alignment)
+# Debug: verify max_probs order
+print("max_probs check (positions 10-14):")
+for i in range(10, 15):
+    print(f"  pos {i}: {family_names[i]} = {max_probs[i]:.3f}")
+
+# Build panel (a) using original feature order
+# If max_probs is sorted, rebuild from sel_df joined back to family_names order
+prob_by_family = dict(zip(sel_df["family"], sel_df["stab_prob"]))
+sel_by_family  = dict(zip(sel_df["family"], sel_df["selected"]))
 df_a = pd.DataFrame({
     "family":    family_names,
-    "stab_prob": max_probs,
-    "selected":  selected_mask[:n_feat],
+    "stab_prob": [prob_by_family[f] for f in family_names],
+    "selected":  [sel_by_family[f]  for f in family_names],
 }).reset_index(drop=True)
+print("df_a first 3:", df_a["family"].head(3).tolist())
 
 fig, (ax_a, ax_b) = plt.subplots(
     2, 1, figsize=(12, 9),
