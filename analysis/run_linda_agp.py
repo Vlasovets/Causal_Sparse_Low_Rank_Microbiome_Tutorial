@@ -26,8 +26,8 @@ from plotly.subplots import make_subplots
 
 import rpy2.robjects as ro
 from rpy2.robjects.packages import importr
-from rpy2.robjects import pandas2ri
-pandas2ri.activate()
+from rpy2.robjects.conversion import localconverter
+import rpy2.robjects.pandas2ri as pandas2ri
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
@@ -83,8 +83,9 @@ w_obs.columns = ["w"]
 
 # ── LinDA on observed assignment ──────────────────────────────────────────────
 print("\n=== LinDA: observed assignment ===")
-r_otu = ro.conversion.py2rpy(otu_T)
-r_w   = ro.conversion.py2rpy(w_obs)
+with localconverter(ro.default_converter + pandas2ri.converter):
+    r_otu = ro.conversion.py2rpy(otu_T)
+    r_w   = ro.conversion.py2rpy(w_obs)
 
 lo   = linda.linda(r_otu, r_w, formula="~w", alpha=ALPHA, prev_cut=0.0, lib_cut=1)
 out  = r_to_pandas(lo.rx2("output"))["w"]
@@ -121,7 +122,8 @@ for i in range(N_PERM):
             w_perm.loc[mask, "W"] = 1 - w_perm.loc[mask, "W"]
     w_perm = w_perm[["W"]].rename(columns={"W": "w"})
 
-    r_w_perm = ro.conversion.py2rpy(w_perm)
+    with localconverter(ro.default_converter + pandas2ri.converter):
+        r_w_perm = ro.conversion.py2rpy(w_perm)
     lo_p     = linda.linda(r_otu, r_w_perm, formula="~w",
                            alpha=ALPHA, prev_cut=0.0, lib_cut=1)
     out_p    = r_to_pandas(lo_p.rx2("output"))["w"]

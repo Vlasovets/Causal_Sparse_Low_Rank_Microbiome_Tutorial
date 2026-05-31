@@ -25,10 +25,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from rpy2.robjects.packages import importr
-from rpy2.robjects import pandas2ri, FloatVector
+from rpy2.robjects import FloatVector
+from rpy2.robjects.conversion import localconverter
 import rpy2.robjects as ro
-
-pandas2ri.activate()
+import rpy2.robjects.pandas2ri as pandas2ri
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -67,7 +67,8 @@ print(f"Transposed OTU table: {otu_T.shape}  (OTUs x samples)")
 
 # ── Richness via Breakaway + betta ────────────────────────────────────────────
 print("\n=== Breakaway richness estimation ===")
-r_otu = ro.conversion.py2rpy(otu_T)
+with localconverter(ro.default_converter + pandas2ri.converter):
+    r_otu = ro.conversion.py2rpy(otu_T)
 ba    = breakaway.breakaway(r_otu)
 summ  = base.summary(ba)
 sum_dict = dict(zip(summ.names, map(list, summ)))
@@ -78,9 +79,10 @@ errors    = np.round(sum_dict["error"],    4)
 W          = meta["W"].reset_index(drop=True)
 design_mat = pd.DataFrame({"intercept": 1, "W": W})
 
-betta_res   = breakaway.betta(chats=FloatVector(estimates),
-                               ses=FloatVector(errors),
-                               X=design_mat)
+with localconverter(ro.default_converter + pandas2ri.converter):
+    betta_res = breakaway.betta(chats=FloatVector(estimates),
+                                ses=FloatVector(errors),
+                                X=design_mat)
 betta_table = pd.DataFrame(betta_res[0],
                             columns=["estimate", "error", "p_value"],
                             index=design_mat.columns)
@@ -112,7 +114,8 @@ print("\n=== DivNet Shannon estimation ===")
 base_taxon = otu_T.sum(axis=1).idxmax()
 print(f"Base OTU for DivNet: {base_taxon}")
 
-r_otu_div = ro.conversion.py2rpy(otu_T)
+with localconverter(ro.default_converter + pandas2ri.converter):
+    r_otu_div = ro.conversion.py2rpy(otu_T)
 dv = divnet.divnet(r_otu_div, base=base_taxon, ncores=4)
 
 shannon = dv[0]
@@ -130,9 +133,10 @@ meta_aligned = meta.loc[div_df.index] if all(i in meta.index for i in div_df.ind
 W_div        = meta_aligned["W"].reset_index(drop=True)
 design_div   = pd.DataFrame({"intercept": 1, "W": W_div})
 
-betta_div = breakaway.betta(chats=FloatVector(div_df["estimate"].values),
-                             ses=FloatVector(div_df["error"].values),
-                             X=design_div)
+with localconverter(ro.default_converter + pandas2ri.converter):
+    betta_div = breakaway.betta(chats=FloatVector(div_df["estimate"].values),
+                                ses=FloatVector(div_df["error"].values),
+                                X=design_div)
 betta_div_table = pd.DataFrame(betta_div[0],
                                 columns=["estimate", "error", "p_value"],
                                 index=design_div.columns)
