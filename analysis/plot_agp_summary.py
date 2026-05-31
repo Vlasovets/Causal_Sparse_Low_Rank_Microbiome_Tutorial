@@ -62,45 +62,51 @@ def safe_float(s):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 1. PAIR-MATCHING BALANCE
+# 1. PAIR-MATCHING BALANCE  (style matches Figure 5.2 / bmi_plot.png in thesis)
 # ═══════════════════════════════════════════════════════════════════════════════
 print("\n=== 1. Pair-matching balance ===")
 
-age_pre_sm  = pd.to_numeric(pre_sm["age_years"],     errors="coerce").dropna()
-age_pre_ns  = pd.to_numeric(pre_ns["age_years"],     errors="coerce").dropna()
+C_SM_HIST = "#5C4B8A"   # dark purple — Smoker
+C_NS_HIST = "#F08080"   # salmon     — non-Smoker
+
 bmi_pre_sm  = pd.to_numeric(pre_sm["bmi_corrected"], errors="coerce").dropna()
 bmi_pre_ns  = pd.to_numeric(pre_ns["bmi_corrected"], errors="coerce").dropna()
-
-age_post_sm = pd.to_numeric(post_sm["age_years"],     errors="coerce").dropna()
-age_post_ns = pd.to_numeric(post_ns["age_years"],     errors="coerce").dropna()
 bmi_post_sm = pd.to_numeric(post_sm["bmi_corrected"], errors="coerce").dropna()
 bmi_post_ns = pd.to_numeric(post_ns["bmi_corrected"], errors="coerce").dropna()
 
-fig, axes = plt.subplots(2, 2, figsize=(10, 7))
-fig.suptitle("AGP: Covariate balance before and after matching", fontsize=13)
+def bmi_panel(ax, sm, ns, title, label):
+    xmin, xmax = 15, 60
+    bins = np.linspace(xmin, xmax, 25)
+    ax.hist(sm, bins=bins, density=True, alpha=0.6, color=C_SM_HIST, label="Smoker")
+    ax.hist(ns, bins=bins, density=True, alpha=0.6, color=C_NS_HIST, label="non-Smoker")
+    for vals, col in [(sm, C_SM_HIST), (ns, C_NS_HIST)]:
+        kde = gaussian_kde(vals, bw_method=0.25)
+        x   = np.linspace(xmin, xmax, 400)
+        ax.plot(x, kde(x), color="black", lw=1.8)
+    ax.set_xlim(xmin, xmax)
+    ax.set_xlabel("BMI (kg/m²)", fontsize=11)
+    ax.set_ylabel("Probability density", fontsize=11)
+    ax.set_title(title, fontsize=12, pad=8)
+    ax.text(0.02, 0.97, label, transform=ax.transAxes,
+            fontsize=13, fontweight="bold", va="top")
+    ax.yaxis.grid(True, color="lightgray", linewidth=0.7)
+    ax.set_axisbelow(True)
+    ax.spines[["top", "right"]].set_visible(False)
 
-def kde_plot(ax, a, b, xlabel, title, la="Smoker", lb="Never-smoker"):
-    for vals, col, lab in [(a, C_SMOKER, la), (b, C_NEVER, lb)]:
-        kde = gaussian_kde(vals, bw_method=0.3)
-        x   = np.linspace(vals.min(), vals.max(), 300)
-        ax.plot(x, kde(x), color=col, lw=2, label=lab)
-        ax.fill_between(x, kde(x), alpha=0.15, color=col)
-    ax.set_xlabel(xlabel, fontsize=10)
-    ax.set_ylabel("Density", fontsize=10)
-    ax.set_title(title, fontsize=10)
-    ax.legend(fontsize=8)
-    ax.spines[["top","right"]].set_visible(False)
+fig, axes = plt.subplots(1, 2, figsize=(11, 4.5), sharey=False)
 
-kde_plot(axes[0,0], age_pre_sm,  age_pre_ns,  "Age (years)",
-         f"Age — before matching\n(n={len(pre_sm)} vs n={len(pre_ns):,})")
-kde_plot(axes[0,1], bmi_pre_sm,  bmi_pre_ns,  "BMI (kg/m²)",
-         f"BMI — before matching\n(n={len(pre_sm)} vs n={len(pre_ns):,})")
-kde_plot(axes[1,0], age_post_sm, age_post_ns, "Age (years)",
-         f"Age — after matching\n(n={len(post_sm)} vs n={len(post_ns)})")
-kde_plot(axes[1,1], bmi_post_sm, bmi_post_ns, "BMI (kg/m²)",
-         f"BMI — after matching\n(n={len(post_sm)} vs n={len(post_ns)})")
+bmi_panel(axes[0], bmi_pre_sm,  bmi_pre_ns,
+          "Before pair-matching", "a")
+bmi_panel(axes[1], bmi_post_sm, bmi_post_ns,
+          "After pair-matching",  "b")
 
-plt.tight_layout()
+# Shared legend below panels
+handles = [mpatches.Patch(color=C_SM_HIST, label="Smoker"),
+           mpatches.Patch(color=C_NS_HIST, label="non-Smoker")]
+fig.legend(handles=handles, loc="lower center", ncol=2,
+           frameon=False, fontsize=11, bbox_to_anchor=(0.5, -0.04))
+
+plt.tight_layout(rect=[0, 0.06, 1, 1])
 save(fig, "agp_matching_balance")
 
 
