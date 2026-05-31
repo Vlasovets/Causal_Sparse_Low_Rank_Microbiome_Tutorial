@@ -91,7 +91,7 @@ with localconverter(ro.default_converter + pandas2ri.converter):
     r_w   = ro.conversion.py2rpy(w_obs)
 
 lo   = linda.linda(r_otu, r_w, formula="~w", alpha=ALPHA, prev_cut=0.0, lib_cut=1)
-out  = r_to_pandas(lo.rx2("output"))["w"]
+out  = r_to_pandas(lo.rx2("output").rx2("w"))
 
 results = pd.DataFrame({
     "family":         out.index,
