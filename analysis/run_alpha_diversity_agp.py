@@ -122,6 +122,9 @@ print(f"Base taxon for DivNet: {base_taxon}")
 
 with localconverter(ro.default_converter + pandas2ri.converter):
     r_otu_div = ro.conversion.py2rpy(otu_T)
+# Explicitly set row names in R so DivNet can find the base taxon
+r_otu_div.rownames = ro.StrVector(otu_T.index.tolist())
+print(f"R matrix rownames (first 3): {list(r_otu_div.rownames)[:3]}")
 dv = divnet.divnet(r_otu_div, base=base_taxon, ncores=4)
 
 shannon = dv[0]

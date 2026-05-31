@@ -140,7 +140,8 @@ perm_df.to_csv(os.path.join(OUT_DIR, "linda_agp_permstats.csv"))
 obs_stat   = results["stat"]
 pval_lee   = calculate_unadjusted_p_values(perm_df, obs_stat, test_type="two-sided")
 min_pvals  = min_unadjusted_p_values(perm_df)
-adj_pvals  = adjusted_p_values(min_pvals, pval_lee)
+# adjusted_p_values uses integer indexing internally; reset index before passing
+adj_pvals  = adjusted_p_values(min_pvals, pval_lee.reset_index(drop=True))
 
 adj_df = pval_lee.copy()
 adj_df.columns = ["p_perm"]
