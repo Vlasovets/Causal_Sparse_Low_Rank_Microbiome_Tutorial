@@ -116,30 +116,48 @@ print(f"Richness plot saved.")
 # ── Shannon via DivNet + betta ────────────────────────────────────────────────
 print("\n=== DivNet Shannon estimation ===")
 
-# DivNet expects samples x taxa (W where columns = taxa, rows = samples)
-otu_div = otu_T.T   # back to samples x families
-base_taxon = str(otu_div.sum(axis=0).idxmax())   # most prevalent column (family)
-print(f"Base taxon for DivNet: {base_taxon}")
+DIVNET_RDS = os.path.join(OUT_DIR, "divnet_output.rds")
+DIVNET_CSV = os.path.join(OUT_DIR, "divnet_shannon.csv")
 
-with localconverter(ro.default_converter + pandas2ri.converter):
-    r_otu_div = ro.conversion.py2rpy(otu_div)
-# Set column names (taxa) explicitly so DivNet can find the base taxon
-r_otu_div.colnames = ro.StrVector(otu_div.columns.tolist())
-print(f"R matrix colnames (first 3): {list(r_otu_div.colnames)[:3]}")
-dv = divnet.divnet(r_otu_div, base=base_taxon, ncores=4)
+# ── Load from cache if available, otherwise run DivNet ────────────────────────
+if os.path.exists(DIVNET_CSV):
+    print(f"Loading cached DivNet estimates from {DIVNET_CSV}")
+    div_df = pd.read_csv(DIVNET_CSV, index_col=0)
+else:
+    # DivNet expects samples x taxa (W where columns = taxa, rows = samples)
+    otu_div    = otu_T.T
+    base_taxon = str(otu_div.sum(axis=0).idxmax())
+    print(f"Base taxon for DivNet: {base_taxon}")
 
-shannon = dv[0]
-div_dict = {}
-for i in range(len(shannon)):
-    sid = str(shannon.names[i])
-    # shannon[i] is an R list; each element is a FloatVector → index with [0]
-    est = shannon[i][0]
-    err = shannon[i][1]
-    div_dict[sid] = (round(float(est[0] if hasattr(est, '__len__') else est), 4),
-                     round(float(err[0] if hasattr(err, '__len__') else err), 4))
+    with localconverter(ro.default_converter + pandas2ri.converter):
+        r_otu_div = ro.conversion.py2rpy(otu_div)
+    r_otu_div.colnames = ro.StrVector(otu_div.columns.tolist())
+    print(f"R matrix colnames (first 3): {list(r_otu_div.colnames)[:3]}")
 
-div_df = pd.DataFrame.from_dict(div_dict, orient="index", columns=["estimate", "error"])
-div_df.to_csv(os.path.join(OUT_DIR, "divnet_shannon.csv"))
+    print("Running DivNet (this takes ~30-40 min) ...")
+    dv = divnet.divnet(r_otu_div, base=base_taxon, ncores=4)
+
+    # ── Save R object immediately so it can be reloaded without re-running ────
+    base_r = importr("base")
+    base_r.saveRDS(dv, file=DIVNET_RDS)
+    print(f"DivNet R object saved to {DIVNET_RDS}")
+
+    # ── Extract per-sample Shannon estimates ──────────────────────────────────
+    shannon  = dv[0]
+    div_dict = {}
+    for i in range(len(shannon)):
+        sid = str(shannon.names[i])
+        est = shannon[i][0]
+        err = shannon[i][1]
+        div_dict[sid] = (
+            round(float(est[0] if hasattr(est, "__len__") else est), 4),
+            round(float(err[0] if hasattr(err, "__len__") else err), 4),
+        )
+
+    div_df = pd.DataFrame.from_dict(div_dict, orient="index", columns=["estimate", "error"])
+    # ── Save CSV immediately after extraction ─────────────────────────────────
+    div_df.to_csv(DIVNET_CSV)
+    print(f"DivNet Shannon estimates saved to {DIVNET_CSV}")
 
 # Align metadata to DivNet output order
 # DivNet may return sample IDs as strings; align by intersection to be safe
