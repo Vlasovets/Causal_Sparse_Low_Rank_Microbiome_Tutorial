@@ -47,7 +47,6 @@ ALPHA  = 0.1    # FDR threshold
 
 # ── R packages ────────────────────────────────────────────────────────────────
 linda = importr("LinDA")
-stats = importr("stats")
 
 # ── Load data ─────────────────────────────────────────────────────────────────
 otu_sm  = pd.read_csv(os.path.join(DATA_DIR, "otu_table_smoker.csv"),     index_col=0)
