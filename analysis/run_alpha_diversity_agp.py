@@ -86,12 +86,12 @@ W          = meta["W"].reset_index(drop=True)
 design_mat = pd.DataFrame({"intercept": 1, "W": W})
 
 with localconverter(ro.default_converter + pandas2ri.converter):
-    betta_res = breakaway.betta(chats=FloatVector(estimates),
-                                ses=FloatVector(errors),
-                                X=design_mat)
-betta_table = pd.DataFrame(betta_res[0],
-                            columns=["estimate", "error", "p_value"],
-                            index=design_mat.columns)
+    betta_res   = breakaway.betta(chats=FloatVector(estimates),
+                                  ses=FloatVector(errors),
+                                  X=design_mat)
+    betta_table = pd.DataFrame(betta_res[0],
+                               columns=["estimate", "error", "p_value"],
+                               index=design_mat.columns)
 print(betta_table)
 betta_table.to_csv(os.path.join(OUT_DIR, "richness_betta_table.csv"))
 
@@ -138,7 +138,16 @@ div_df = pd.DataFrame.from_dict(div_dict, orient="index", columns=["estimate", "
 div_df.to_csv(os.path.join(OUT_DIR, "divnet_shannon.csv"))
 
 # Align metadata to DivNet output order
-meta_aligned = meta.loc[div_df.index] if all(i in meta.index for i in div_df.index) else meta
+# DivNet may return sample IDs as strings; align by intersection to be safe
+common = div_df.index.intersection(meta.index)
+if len(common) == len(div_df):
+    meta_aligned = meta.loc[div_df.index]
+else:
+    print(f"Warning: {len(div_df) - len(common)} DivNet samples not in metadata; using all meta")
+    meta_aligned = meta.copy()
+    meta_aligned.index = meta_aligned.index.astype(str)
+    div_df.index = div_df.index.astype(str)
+    meta_aligned = meta_aligned.loc[meta_aligned.index.intersection(div_df.index)]
 W_div        = meta_aligned["W"].reset_index(drop=True)
 design_div   = pd.DataFrame({"intercept": 1, "W": W_div})
 

@@ -89,6 +89,9 @@ print("\n=== LinDA: observed assignment ===")
 with localconverter(ro.default_converter + pandas2ri.converter):
     r_otu = ro.conversion.py2rpy(otu_T)
     r_w   = ro.conversion.py2rpy(w_obs)
+# Explicitly set row names so LinDA output carries family names as index
+r_otu.rownames = ro.StrVector(otu_T.index.tolist())
+print(f"r_otu rownames (first 3): {list(r_otu.rownames)[:3]}")
 
 lo   = linda.linda(r_otu, r_w, formula="~w", alpha=ALPHA, prev_cut=0.0, lib_cut=1)
 out  = r_to_pandas(lo.rx2("output").rx2("w"))
