@@ -214,8 +214,12 @@ C_NOSEL = "#5C4B8A"   # purple  — Selected False
 C_COEF  = "#2C3E6B"   # navy    — refit coefficients
 THRESH  = STABSEL_THRESH
 
-# Sort panel (a) by stab_prob descending
-df_a = sel_df.sort_values("stab_prob", ascending=False).reset_index(drop=True)
+# Panel (a): original feature order (matches panel b alignment)
+df_a = pd.DataFrame({
+    "family":    family_names,
+    "stab_prob": max_probs,
+    "selected":  selected_mask[:n_feat],
+}).reset_index(drop=True)
 
 fig, (ax_a, ax_b) = plt.subplots(
     2, 1, figsize=(12, 9),
