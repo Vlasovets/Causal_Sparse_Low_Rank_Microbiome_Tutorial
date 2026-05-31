@@ -164,15 +164,37 @@ sel_df.to_csv(os.path.join(OUT_DIR, "selected_families_agp.csv"), index=False)
 # ── Extract and save refit coefficients ──────────────────────────────────────
 refit_beta = np.array(sol.StabSel.refit) if sol.StabSel.refit is not None else np.array([])
 
+# Diagnostics: show full refit vector
+print(f"\n--- refit_beta diagnostics ---")
+print(f"len(refit_beta)={len(refit_beta)},  n_feat={n_feat}")
+nz = np.where(np.abs(refit_beta) > 1e-8)[0]
+print(f"Non-zero positions: {nz}, values: {refit_beta[nz]}")
+
 # Selected features in their ORIGINAL column order (matches refit_beta ordering)
 selected_indices       = np.where(selected_mask[:n_feat])[0]
 sel_families_ordered   = [family_names[i] for i in selected_indices]
 n_sel                  = len(sel_families_ordered)
+print(f"selected_indices={selected_indices}, sel_families={sel_families_ordered}")
 
 # refit vector layout: [intercept, coef_feature_orig_order_1, ..., coef_feature_orig_order_k]
-has_intercept = (len(refit_beta) == n_sel + 1)
-intercept_val = float(refit_beta[0]) if has_intercept else 0.0
-coef_vals     = refit_beta[1:n_sel + 1] if has_intercept else refit_beta[:n_sel]
+# OR: [coef_feature_1, ..., coef_feature_40] (full vector, no intercept)
+# Detect: if len == n_feat+1 it includes intercept; if len == n_feat it's all features
+if len(refit_beta) == n_feat + 1:      # full feature set + intercept
+    intercept_val = float(refit_beta[0])
+    coef_vals     = refit_beta[1:][selected_indices]   # extract selected by index
+elif len(refit_beta) == n_feat:        # full feature set, no intercept
+    intercept_val = 0.0
+    coef_vals     = refit_beta[selected_indices]
+elif len(refit_beta) == n_sel + 1:     # selected only + intercept
+    intercept_val = float(refit_beta[0])
+    coef_vals     = refit_beta[1:]
+elif len(refit_beta) == n_sel:         # selected only, no intercept
+    intercept_val = 0.0
+    coef_vals     = refit_beta
+else:
+    print(f"WARNING: unexpected refit_beta length {len(refit_beta)}")
+    intercept_val = 0.0
+    coef_vals     = refit_beta[:n_sel]
 
 print(f"\nRefit coefficients (original feature order):")
 for fam, c in zip(sel_families_ordered, coef_vals):
