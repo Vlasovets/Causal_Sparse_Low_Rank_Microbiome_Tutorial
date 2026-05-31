@@ -162,17 +162,26 @@ print(sel_df[sel_df["selected"]][["family","stab_prob"]].to_string(index=False))
 sel_df.to_csv(os.path.join(OUT_DIR, "selected_families_agp.csv"), index=False)
 
 # ── Extract and save refit coefficients ──────────────────────────────────────
-refit_beta  = np.array(sol.StabSel.refit) if sol.StabSel.refit is not None else np.array([])
-sel_families = sel_df[sel_df["selected"]]["family"].tolist()
-n_sel = len(sel_families)
+refit_beta = np.array(sol.StabSel.refit) if sol.StabSel.refit is not None else np.array([])
 
-# refit vector: [intercept?, coef_sel_1, ..., coef_sel_k]
+# Selected features in their ORIGINAL column order (matches refit_beta ordering)
+selected_indices       = np.where(selected_mask[:n_feat])[0]
+sel_families_ordered   = [family_names[i] for i in selected_indices]
+n_sel                  = len(sel_families_ordered)
+
+# refit vector layout: [intercept, coef_feature_orig_order_1, ..., coef_feature_orig_order_k]
 has_intercept = (len(refit_beta) == n_sel + 1)
 intercept_val = float(refit_beta[0]) if has_intercept else 0.0
-coef_vals     = refit_beta[1:n_sel+1] if has_intercept else refit_beta[:n_sel]
+coef_vals     = refit_beta[1:n_sel + 1] if has_intercept else refit_beta[:n_sel]
+
+print(f"\nRefit coefficients (original feature order):")
+for fam, c in zip(sel_families_ordered, coef_vals):
+    print(f"  {fam}: {c:.4f}")
+print(f"  intercept: {intercept_val:.4f}")
+print(f"  sum(feature coefs) = {sum(coef_vals):.6f}  [should be ~0 for log-contrast]")
 
 refit_df = pd.DataFrame({
-    "term":  ["intercept"] + sel_families,
+    "term":  ["intercept"] + sel_families_ordered,
     "coef":  [intercept_val] + list(coef_vals),
 })
 refit_df.to_csv(os.path.join(OUT_DIR, "refit_coefficients_agp.csv"), index=False)
