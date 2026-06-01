@@ -244,4 +244,46 @@ if (n_diff_hub > 0) {
   message("  No significant differential associations in hub subgraph.")
 }
 
+# ── SLR network — same top-30 hub nodes and layout ───────────────────────────
+message("\n=== KORA SLR network (same top-30 hubs, same layout) ===")
+slr_sm_path <- file.path(KORA_ROOT, "results", "genus", "slr", "py_slr_theta_smoker.csv")
+slr_ns_path <- file.path(KORA_ROOT, "results", "genus", "slr", "py_slr_theta_non_smoker.csv")
+
+theta_slr_sm <- as.matrix(read.csv(slr_sm_path, row.names=1, check.names=FALSE))
+theta_slr_ns <- as.matrix(read.csv(slr_ns_path, row.names=1, check.names=FALSE))
+pcor_slr_sm  <- theta_to_pcor(theta_slr_sm)
+pcor_slr_ns  <- theta_to_pcor(theta_slr_ns)
+
+# Subset to the same top-30 hub nodes
+pcor_slr_sm_hub <- pcor_slr_sm[top_nodes, top_nodes]
+pcor_slr_ns_hub <- pcor_slr_ns[top_nodes, top_nodes]
+n_slr_sm_hub <- sum(pcor_slr_sm_hub[upper.tri(pcor_slr_sm_hub)] != 0)
+n_slr_ns_hub <- sum(pcor_slr_ns_hub[upper.tri(pcor_slr_ns_hub)] != 0)
+message(sprintf("SLR hub edges: smoker=%d, non-smoker=%d", n_slr_sm_hub, n_slr_ns_hub))
+
+net_slr_hub   <- netConstruct(data=pcor_slr_sm_hub, data2=pcor_slr_ns_hub,
+                               dataType="condDependence", sparsMethod="none",
+                               normMethod="none", verbose=0, seed=123456)
+props_slr_hub <- netAnalyze(net_slr_hub, clustMethod="cluster_fast_greedy", verbose=FALSE)
+
+message("Saving KORA SLR hub combined plot ...")
+for (ext in c("png","svg")) {
+  out <- file.path(FIG_DIR, paste0("netcomi_slr_kora_combined.", ext))
+  if (ext=="png") png(out, width=4800, height=2400, res=300)
+  else            svg(out, width=16, height=8)
+  plot(props_slr_hub,
+       groupNames = c(paste0("SLR: Smoker  |  top ", N_HUBS, " hubs  |  ", n_slr_sm_hub, " edges"),
+                      paste0("SLR: Non-Smoker  |  top ", N_HUBS, " hubs  |  ", n_slr_ns_hub, " edges")),
+       sameLayout = TRUE,
+       rmSingles  = FALSE,
+       nodeColor  = "colorVec",
+       colorVec   = node_cols_hub,
+       featVecCol = phyla_hub,
+       repulsion  = 1.2,
+       labelScale = FALSE,
+       cexLabels  = 0.75)
+  dev.off()
+  message(sprintf("  Saved: netcomi_slr_kora_combined.%s", ext))
+}
+
 message("KORA genus sparse NetCoMi plots done.")

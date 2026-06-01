@@ -72,6 +72,15 @@ rownames(pcor_ns) <- colnames(pcor_ns) <- labels[taxa_ids]
 
 # Use shared fixed palette (phylum_palette.R) for cross-dataset colour consistency
 node_cols <- setNames(sapply(phyla, phylum_colour), names(phyla))
+
+# Helper: reindex pcor matrix to a target set of node names (pads with 0 for missing)
+reindex_to_labels <- function(pcor_mat, target_names) {
+  n   <- length(target_names)
+  out <- matrix(0, n, n, dimnames=list(target_names, target_names))
+  common <- intersect(rownames(pcor_mat), target_names)
+  out[common, common] <- pcor_mat[common, common]
+  out
+}
 message(sprintf("AGP phyla: %s", paste(sort(unique(phyla)), collapse=", ")))
 
 # ── NetCoMi ─────────────────────────────────────────────────────────────────
@@ -253,6 +262,47 @@ if (n_diff > 0) {
   }
 } else {
   message("  No significant differential associations — skipping diff plot.")
+}
+
+# ── SLR network — same shared layout for direct comparison ───────────────────
+message("\n=== SLR network (same layout as sparse) ===")
+theta_slr_sm <- load_theta(file.path(SPARSE, "..", "slr", "py_slr_theta_smoker.csv"))
+theta_slr_ns <- load_theta(file.path(SPARSE, "..", "slr", "py_slr_theta_non_smoker.csv"))
+pcor_slr_sm  <- theta_to_pcor(theta_slr_sm)
+pcor_slr_ns  <- theta_to_pcor(theta_slr_ns)
+
+# Align to same superset as sparse (so shared layout applies)
+pcor_slr_sm <- reindex_to_labels(pcor_slr_sm, names(node_cols))
+pcor_slr_ns <- reindex_to_labels(pcor_slr_ns, names(node_cols))
+
+n_slr_sm <- sum(pcor_slr_sm[upper.tri(pcor_slr_sm)] != 0)
+n_slr_ns <- sum(pcor_slr_ns[upper.tri(pcor_slr_ns)] != 0)
+message(sprintf("SLR edges: smoker=%d, non-smoker=%d", n_slr_sm, n_slr_ns))
+
+net_slr   <- netConstruct(data=pcor_slr_sm, data2=pcor_slr_ns,
+                           dataType="condDependence", sparsMethod="none",
+                           normMethod="none", verbose=0, seed=123456)
+props_slr <- netAnalyze(net_slr, clustMethod="cluster_fast_greedy", verbose=FALSE)
+
+message("Saving AGP SLR combined network plot ...")
+for (ext in c("png","svg")) {
+  out <- file.path(FIG_DIR, paste0("netcomi_slr_agp_combined.", ext))
+  if (ext=="png") png(out, width=4800, height=2000, res=300)
+  else            svg(out, width=16, height=6.67)
+  plot(props_slr,
+       groupNames = c(paste0("SLR: Smoker  |  ", n_slr_sm, " edges"),
+                      paste0("SLR: Non-Smoker  |  ", n_slr_ns, " edges")),
+       sameLayout = TRUE,
+       layout     = layout_ref,
+       rmSingles  = FALSE,
+       nodeColor  = "colorVec",
+       colorVec   = node_cols,
+       featVecCol = phyla,
+       repulsion  = 0.9,
+       labelScale = FALSE,
+       cexLabels  = 0.70)
+  dev.off()
+  message(sprintf("  Saved: netcomi_slr_agp_combined.%s", ext))
 }
 
 message("AGP sparse NetCoMi plots done.")
