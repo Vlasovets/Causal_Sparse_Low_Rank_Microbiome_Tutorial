@@ -93,24 +93,56 @@ p_ref <- plot(props,
               labelCol   = "black")
 layout_ref <- p_ref$layout$layout1
 
-# ── Combined two-group plot (true smoker vs non-smoker) ──────────────────────
-message("Saving KORA genus sparse COMBINED network plot ...")
+# ── Hub-only combined plot (top 30 nodes by union degree) ────────────────────
+N_HUBS <- 30
+message(sprintf("Computing top %d hub nodes by union degree ...", N_HUBS))
+
+# Union adjacency: node present in either network counts
+adj_union <- (abs(pcor_sm) > 0) | (abs(pcor_ns) > 0)
+diag(adj_union) <- FALSE
+union_degree  <- rowSums(adj_union)
+top_nodes     <- names(sort(union_degree, decreasing = TRUE))[1:N_HUBS]
+message("Top hub genera: ", paste(head(top_nodes, 8), collapse = ", "), " ...")
+
+pcor_sm_hub <- pcor_sm[top_nodes, top_nodes]
+pcor_ns_hub <- pcor_ns[top_nodes, top_nodes]
+node_cols_hub <- node_cols[top_nodes]
+phyla_hub     <- phyla[top_nodes]
+
+n_sm_hub <- sum(pcor_sm_hub[upper.tri(pcor_sm_hub)] != 0)
+n_ns_hub <- sum(pcor_ns_hub[upper.tri(pcor_ns_hub)] != 0)
+message(sprintf("Hub subnetwork edges: smoker=%d, non-smoker=%d", n_sm_hub, n_ns_hub))
+
+net_hub <- netConstruct(data     = pcor_sm_hub,
+                        data2    = pcor_ns_hub,
+                        dataType = "condDependence",
+                        sparsMethod = "none",
+                        normMethod  = "none",
+                        verbose     = 0,
+                        seed        = 123456)
+props_hub <- netAnalyze(net_hub, clustMethod = "cluster_fast_greedy",
+                        verbose = FALSE)
+
+message("Saving KORA genus sparse hub-only combined plot ...")
 for (ext in c("png", "svg")) {
   out <- file.path(FIG_DIR, paste0("netcomi_sparse_kora_combined.", ext))
-  if (ext == "png") png(out, width = 5000, height = 2800, res = 300)
-  else               svg(out, width = 16.67, height = 9.33)
-  plot(props,
-       groupNames = c(paste0("Smoker  |  ", n_sm, " edges"),
-                      paste0("Non-Smoker  |  ", n_ns, " edges")),
+  if (ext == "png") png(out, width = 4800, height = 2400, res = 300)
+  else               svg(out, width = 16, height = 8)
+  plot(props_hub,
+       groupNames = c(paste0("Smoker  |  top ", N_HUBS, " hubs  |  ",
+                              n_sm_hub, " edges"),
+                      paste0("Non-Smoker  |  top ", N_HUBS, " hubs  |  ",
+                              n_ns_hub, " edges")),
        sameLayout = TRUE,
-       layout     = layout_ref,
        rmSingles  = FALSE,
        nodeColor  = "colorVec",
-       colorVec   = node_cols,
-       featVecCol = phyla,
-       repulsion  = 1.8,
+       colorVec   = node_cols_hub,
+       featVecCol = phyla_hub,
+       repulsion  = 1.2,
        labelScale = FALSE,
-       cexLabels  = 0.40)
+       cexLabels  = 0.75,
+       title1     = paste0("Smoker | top ", N_HUBS, " hubs | ", n_sm_hub, " edges"),
+       title2     = paste0("Non-Smoker | top ", N_HUBS, " hubs | ", n_ns_hub, " edges"))
   dev.off()
   message(sprintf("  Saved: netcomi_sparse_kora_combined.%s", ext))
 }
