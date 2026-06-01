@@ -1,0 +1,144 @@
+#!/usr/bin/env Rscript
+# Sparse graphical lasso NetCoMi plots — AGP (family level)
+#
+# Fixes the incorrect edge count in the old netcomi_sparse_*.png plots,
+# which loaded Alice's SLR Theta. This script loads the Python sparse GL
+# precision matrices (py_sparse_theta_smoker/non_smoker.csv) which have
+# 24 (smoker) and 41 (non-smoker) edges at lambda* = 0.707 / 0.537.
+#
+# Output -> results/two_group/figures/
+#   netcomi_sparse_smoker.png / .svg
+#   netcomi_sparse_non_smoker.png / .svg
+
+suppressPackageStartupMessages({ library(NetCoMi) })
+
+args        <- commandArgs(trailingOnly = FALSE)
+script_file <- sub("--file=", "", args[grep("--file=", args)])
+ROOT        <- normalizePath(file.path(dirname(script_file), ".."))
+
+SRC_AG  <- file.path(ROOT, "source", "design_AG")
+SPARSE  <- file.path(ROOT, "results", "two_group", "sparse")
+FIG_DIR <- file.path(ROOT, "results", "two_group", "figures")
+dir.create(FIG_DIR, showWarnings = FALSE, recursive = TRUE)
+
+# ── Load sparse GL precision matrices (Python results) ─────────────────────
+load_theta <- function(path) {
+  m <- read.csv(path, row.names = 1, check.names = TRUE)
+  colnames(m) <- sub("^X", "", colnames(m))
+  as.matrix(m)
+}
+
+theta_sm <- load_theta(file.path(SPARSE, "py_sparse_theta_smoker.csv"))
+theta_ns <- load_theta(file.path(SPARSE, "py_sparse_theta_non_smoker.csv"))
+
+# ── Partial correlations ────────────────────────────────────────────────────
+theta_to_pcor <- function(Theta) {
+  d    <- sqrt(diag(Theta))
+  P    <- -Theta / outer(d, d)
+  diag(P) <- 0
+  P[abs(P) < 1e-10] <- 0
+  P
+}
+pcor_sm <- theta_to_pcor(theta_sm)
+pcor_ns <- theta_to_pcor(theta_ns)
+
+n_sm <- sum(pcor_sm[upper.tri(pcor_sm)] != 0)
+n_ns <- sum(pcor_ns[upper.tri(pcor_ns)] != 0)
+message(sprintf("Sparse edges: smoker=%d, non-smoker=%d", n_sm, n_ns))
+
+# ── Taxonomy & labels ───────────────────────────────────────────────────────
+taxa_ids <- colnames(theta_sm)
+tax      <- read.csv(file.path(SRC_AG, "tax_table_smoker.csv"),
+                     row.names = 1, stringsAsFactors = FALSE)
+
+make_label <- function(id) {
+  fam <- tax[id, "Family"]
+  if (!is.na(fam) && nchar(fam) > 1 && fam != "nan") return(fam)
+  ord <- tax[id, "Order"]
+  if (!is.na(ord) && nchar(ord) > 1) return(paste0("[", ord, "]"))
+  return(paste0("OTU_", id))
+}
+labels <- setNames(sapply(taxa_ids, make_label), taxa_ids)
+
+phyla <- setNames(sapply(taxa_ids, function(id) {
+  ph <- tax[id, "Phylum"]
+  if (is.na(ph) || ph == "") "Unknown" else ph
+}), labels[taxa_ids])
+
+# Rename matrix rows/cols to labels
+rownames(pcor_sm) <- colnames(pcor_sm) <- labels[taxa_ids]
+rownames(pcor_ns) <- colnames(pcor_ns) <- labels[taxa_ids]
+
+pal <- c("#88CCEE","#CC6677","#DDCC77","#117733","#332288",
+         "#AA4499","#44AA99","#999933","#882255","#661100",
+         "#6699CC","#888888","#E69F00")
+unique_phyla <- sort(unique(phyla))
+phy_cols     <- setNames(pal[seq_along(unique_phyla)], unique_phyla)
+node_cols    <- phy_cols[phyla]
+names(node_cols) <- names(phyla)
+
+# ── NetCoMi ─────────────────────────────────────────────────────────────────
+message("Constructing networks ...")
+net <- netConstruct(data     = pcor_sm,
+                    data2    = pcor_ns,
+                    dataType = "condDependence",
+                    sparsMethod = "none",
+                    normMethod  = "none",
+                    verbose     = 0,
+                    seed        = 123456)
+
+props <- netAnalyze(net, clustMethod = "cluster_fast_greedy", verbose = FALSE)
+
+# ── Shared layout from the denser (non-smoker) network ──────────────────────
+p_ref <- plot(props,
+              groupNames = c("Smoker", "Non-Smoker"),
+              sameLayout = TRUE,
+              rmSingles  = FALSE,
+              nodeColor  = "colorVec",
+              colorVec   = node_cols,
+              featVecCol = phyla,
+              legendArgs = list(title = "Phylum"),
+              repulsion  = 0.9,
+              labelScale = FALSE,
+              cexLabels  = 0.70,
+              labelCol   = "black")
+layout_ref <- p_ref$layout$layout1
+
+# ── Plot individual networks ─────────────────────────────────────────────────
+save_net <- function(stem, title, pcor_mat, layout_mat) {
+  net1 <- netConstruct(data = pcor_mat, dataType = "condDependence",
+                       sparsMethod = "none", normMethod = "none",
+                       verbose = 0, seed = 123456)
+  pr1  <- netAnalyze(net1, clustMethod = "cluster_fast_greedy", verbose = FALSE)
+
+  for (ext in c("png", "svg")) {
+    out <- file.path(FIG_DIR, paste0(stem, ".", ext))
+    if (ext == "png") png(out, width = 2400, height = 2000, res = 300)
+    else               svg(out, width = 8, height = 6.67)
+
+    plot(pr1,
+         groupNames = title,
+         sameLayout = FALSE,
+         layout     = layout_mat,
+         rmSingles  = FALSE,
+         nodeColor  = "colorVec",
+         colorVec   = node_cols,
+         featVecCol = phyla,
+         legendArgs = list(title = "Phylum"),
+         repulsion  = 0.9,
+         labelScale = FALSE,
+         cexLabels  = 0.70,
+         labelCol   = "black",
+         main       = paste0("Sparse graphical lasso — ", title,
+                             "  |  ", sum(pcor_mat[upper.tri(pcor_mat)] != 0),
+                             " edges"))
+    dev.off()
+    message(sprintf("  Saved: %s.%s", stem, ext))
+  }
+}
+
+message("Saving individual sparse network plots ...")
+save_net("netcomi_sparse_smoker",     "Smoker",      pcor_sm, layout_ref)
+save_net("netcomi_sparse_non_smoker", "Non-Smoker",  pcor_ns, layout_ref)
+
+message("AGP sparse NetCoMi plots done.")
