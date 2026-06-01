@@ -93,6 +93,28 @@ p_ref <- plot(props,
               labelCol   = "black")
 layout_ref <- p_ref$layout$layout1
 
+# ── Combined two-group plot (true smoker vs non-smoker) ──────────────────────
+message("Saving KORA genus sparse COMBINED network plot ...")
+for (ext in c("png", "svg")) {
+  out <- file.path(FIG_DIR, paste0("netcomi_sparse_kora_combined.", ext))
+  if (ext == "png") png(out, width = 5000, height = 2800, res = 300)
+  else               svg(out, width = 16.67, height = 9.33)
+  plot(props,
+       groupNames = c(paste0("Smoker  |  ", n_sm, " edges"),
+                      paste0("Non-Smoker  |  ", n_ns, " edges")),
+       sameLayout = TRUE,
+       layout     = layout_ref,
+       rmSingles  = FALSE,
+       nodeColor  = "colorVec",
+       colorVec   = node_cols,
+       featVecCol = phyla,
+       repulsion  = 1.8,
+       labelScale = FALSE,
+       cexLabels  = 0.40)
+  dev.off()
+  message(sprintf("  Saved: netcomi_sparse_kora_combined.%s", ext))
+}
+
 message("Saving KORA genus sparse network plots ...")
 for (grp in list(list(stem="netcomi_sparse_smoker",     pcor=pcor_sm, label="Smoker",     n=n_sm),
                  list(stem="netcomi_sparse_non_smoker",  pcor=pcor_ns, label="Non-Smoker", n=n_ns))) {
