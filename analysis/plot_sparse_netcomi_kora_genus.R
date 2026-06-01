@@ -93,42 +93,33 @@ p_ref <- plot(props,
               labelCol   = "black")
 layout_ref <- p_ref$layout$layout1
 
-# ── Save individual plots ────────────────────────────────────────────────────
-save_net <- function(stem, title, pcor_mat, layout_mat) {
-  net1 <- netConstruct(data = pcor_mat, dataType = "condDependence",
-                       sparsMethod = "none", normMethod = "none",
-                       verbose = 0, seed = 123456)
-  pr1  <- netAnalyze(net1, clustMethod = "cluster_fast_greedy", verbose = FALSE)
-
-  n_edges <- sum(pcor_mat[upper.tri(pcor_mat)] != 0)
-
+message("Saving KORA genus sparse network plots ...")
+for (grp in list(list(stem="netcomi_sparse_smoker",     pcor=pcor_sm, label="Smoker",     n=n_sm),
+                 list(stem="netcomi_sparse_non_smoker",  pcor=pcor_ns, label="Non-Smoker", n=n_ns))) {
   for (ext in c("png", "svg")) {
-    out <- file.path(FIG_DIR, paste0(stem, ".", ext))
+    out <- file.path(FIG_DIR, paste0(grp$stem, ".", ext))
     if (ext == "png") png(out, width = 3000, height = 2800, res = 300)
     else               svg(out, width = 10, height = 9.33)
-
+    net1 <- netConstruct(data = grp$pcor, data2 = grp$pcor,
+                         dataType = "condDependence",
+                         sparsMethod = "none", normMethod = "none",
+                         verbose = 0, seed = 123456)
+    pr1  <- netAnalyze(net1, clustMethod = "cluster_fast_greedy", verbose = FALSE)
     plot(pr1,
-         groupNames = title,
-         sameLayout = FALSE,
-         layout     = layout_mat,
+         groupNames = c(paste0("KORA genus — Sparse GL — ", grp$label,
+                                "  |  ", grp$n, " edges"), ""),
+         sameLayout = TRUE,
+         layout     = layout_ref,
          rmSingles  = FALSE,
          nodeColor  = "colorVec",
          colorVec   = node_cols,
          featVecCol = phyla,
-         legendArgs = list(title = "Phylum"),
          repulsion  = 1.8,
          labelScale = FALSE,
-         cexLabels  = 0.45,
-         labelCol   = "black",
-         main       = paste0("KORA genus — Sparse graphical lasso — ", title,
-                             "  |  ", n_edges, " edges"))
+         cexLabels  = 0.45)
     dev.off()
-    message(sprintf("  Saved: %s.%s", stem, ext))
+    message(sprintf("  Saved: %s.%s", grp$stem, ext))
   }
 }
-
-message("Saving KORA genus sparse network plots ...")
-save_net("netcomi_sparse_smoker",     "Smoker",     pcor_sm, layout_ref)
-save_net("netcomi_sparse_non_smoker", "Non-Smoker", pcor_ns, layout_ref)
 
 message("KORA genus sparse NetCoMi plots done.")

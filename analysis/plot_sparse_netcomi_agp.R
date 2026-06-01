@@ -104,41 +104,92 @@ p_ref <- plot(props,
               labelCol   = "black")
 layout_ref <- p_ref$layout$layout1
 
-# ── Plot individual networks ─────────────────────────────────────────────────
-save_net <- function(stem, title, pcor_mat, layout_mat) {
-  net1 <- netConstruct(data = pcor_mat, dataType = "condDependence",
-                       sparsMethod = "none", normMethod = "none",
-                       verbose = 0, seed = 123456)
-  pr1  <- netAnalyze(net1, clustMethod = "cluster_fast_greedy", verbose = FALSE)
-
+# ── Save combined two-group plot and individual cropped panels ───────────────
+save_combined <- function(stem, group1, group2) {
   for (ext in c("png", "svg")) {
     out <- file.path(FIG_DIR, paste0(stem, ".", ext))
-    if (ext == "png") png(out, width = 2400, height = 2000, res = 300)
-    else               svg(out, width = 8, height = 6.67)
-
-    plot(pr1,
-         groupNames = title,
-         sameLayout = FALSE,
-         layout     = layout_mat,
+    if (ext == "png") png(out, width = 4800, height = 2000, res = 300)
+    else               svg(out, width = 16, height = 6.67)
+    plot(props,
+         groupNames = c(paste0("Smoker  |  ", n_sm, " edges"),
+                        paste0("Non-Smoker  |  ", n_ns, " edges")),
+         sameLayout = TRUE,
+         layout     = layout_ref,
          rmSingles  = FALSE,
          nodeColor  = "colorVec",
          colorVec   = node_cols,
          featVecCol = phyla,
-         legendArgs = list(title = "Phylum"),
          repulsion  = 0.9,
          labelScale = FALSE,
-         cexLabels  = 0.70,
-         labelCol   = "black",
-         main       = paste0("Sparse graphical lasso — ", title,
-                             "  |  ", sum(pcor_mat[upper.tri(pcor_mat)] != 0),
-                             " edges"))
+         cexLabels  = 0.70)
     dev.off()
     message(sprintf("  Saved: %s.%s", stem, ext))
   }
 }
 
-message("Saving individual sparse network plots ...")
-save_net("netcomi_sparse_smoker",     "Smoker",      pcor_sm, layout_ref)
-save_net("netcomi_sparse_non_smoker", "Non-Smoker",  pcor_ns, layout_ref)
+# Individual panels: plot two-group but crop to left or right half via margins
+save_panel <- function(stem, which_group, group_label, n_edges) {
+  for (ext in c("png", "svg")) {
+    out <- file.path(FIG_DIR, paste0(stem, ".", ext))
+    if (ext == "png") png(out, width = 2400, height = 2000, res = 300)
+    else               svg(out, width = 8, height = 6.67)
+
+    gnames <- if (which_group == 1)
+      c(paste0("Sparse graphical lasso — ", group_label, "  |  ", n_edges, " edges"), "")
+    else
+      c("", paste0("Sparse graphical lasso — ", group_label, "  |  ", n_edges, " edges"))
+
+    # Use layout from the relevant group
+    lay <- if (which_group == 1) layout_ref else p_ref$layout$layout2
+
+    plot(props,
+         groupNames = gnames,
+         sameLayout = FALSE,
+         layout     = lay,
+         rmSingles  = FALSE,
+         nodeColor  = "colorVec",
+         colorVec   = node_cols,
+         featVecCol = phyla,
+         repulsion  = 0.9,
+         labelScale = FALSE,
+         cexLabels  = 0.70,
+         # Hide the unwanted panel by making it blank
+         mar        = if (which_group == 1) c(2,2,4,2) else c(2,2,4,2))
+    dev.off()
+    message(sprintf("  Saved: %s.%s", stem, ext))
+  }
+}
+
+message("Saving AGP sparse network plots ...")
+save_combined("netcomi_sparse_agp_combined", "Smoker", "Non-Smoker")
+
+# Individual panels via single-group netConstruct (workaround: pass both groups, mask titles)
+for (grp in list(list(stem="netcomi_sparse_smoker",     pcor=pcor_sm, label="Smoker",     n=n_sm),
+                 list(stem="netcomi_sparse_non_smoker",  pcor=pcor_ns, label="Non-Smoker", n=n_ns))) {
+  for (ext in c("png", "svg")) {
+    out <- file.path(FIG_DIR, paste0(grp$stem, ".", ext))
+    if (ext == "png") png(out, width = 2400, height = 2000, res = 300)
+    else               svg(out, width = 8, height = 6.67)
+    net1 <- netConstruct(data = grp$pcor, data2 = grp$pcor,
+                         dataType = "condDependence",
+                         sparsMethod = "none", normMethod = "none",
+                         verbose = 0, seed = 123456)
+    pr1  <- netAnalyze(net1, clustMethod = "cluster_fast_greedy", verbose = FALSE)
+    plot(pr1,
+         groupNames = c(paste0("Sparse graphical lasso — ", grp$label,
+                                "  |  ", grp$n, " edges"), ""),
+         sameLayout = TRUE,
+         layout     = layout_ref,
+         rmSingles  = FALSE,
+         nodeColor  = "colorVec",
+         colorVec   = node_cols,
+         featVecCol = phyla,
+         repulsion  = 0.9,
+         labelScale = FALSE,
+         cexLabels  = 0.70)
+    dev.off()
+    message(sprintf("  Saved: %s.%s", grp$stem, ext))
+  }
+}
 
 message("AGP sparse NetCoMi plots done.")
