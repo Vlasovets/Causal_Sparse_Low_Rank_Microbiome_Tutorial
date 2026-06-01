@@ -96,7 +96,9 @@ p_ref <- plot(props,
               labelScale = FALSE,
               cexLabels  = 0.45,
               labelCol   = "black")
-layout_ref <- p_ref$layout$layout1
+layout_raw <- p_ref$layout$layout1
+if (is.null(rownames(layout_raw))) rownames(layout_raw) <- top_nodes
+layout_ref <- layout_raw
 
 # ── Hub-only combined plot (top 30 nodes by union degree) ────────────────────
 N_HUBS <- 30

@@ -108,7 +108,14 @@ p_ref <- plot(props,
               labelScale = FALSE,
               cexLabels  = 0.70,
               labelCol   = "black")
-layout_ref <- p_ref$layout$layout1
+# Build a NAMED layout matrix so node coordinates are matched by name, not index
+layout_raw <- p_ref$layout$layout1
+# layout_raw rows correspond to internal node order; assign node names as rownames
+# so the SLR network (same node names, different internal order) maps correctly
+if (is.null(rownames(layout_raw))) {
+  rownames(layout_raw) <- names(node_cols)
+}
+layout_ref <- layout_raw
 
 # ── Load permApprox significant edges (FDR < 0.1) ────────────────────────────
 perm_file <- file.path(SPARSE, "sparse_edge_pvals.csv")
