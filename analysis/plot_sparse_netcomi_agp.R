@@ -83,233 +83,113 @@ reindex_to_labels <- function(pcor_mat, target_names) {
 }
 message(sprintf("AGP phyla: %s", paste(sort(unique(phyla)), collapse=", ")))
 
-# ── NetCoMi ─────────────────────────────────────────────────────────────────
-message("Constructing networks ...")
-net <- netConstruct(data     = pcor_sm,
-                    data2    = pcor_ns,
-                    dataType = "condDependence",
-                    sparsMethod = "none",
-                    normMethod  = "none",
-                    verbose     = 0,
-                    seed        = 123456)
 
-props <- netAnalyze(net, clustMethod = "cluster_fast_greedy", verbose = FALSE)
+# ── Step 1: Build sparse network and extract reference layout ─────────────────
+message("Constructing sparse reference network ...")
+net_sp <- netConstruct(data = pcor_sm, data2 = pcor_ns,
+                       dataType = "condDependence",
+                       sparsMethod = "none", normMethod = "none",
+                       verbose = 0, seed = 123456)
+props_sp <- netAnalyze(net_sp, clustMethod = "cluster_fast_greedy", verbose = FALSE)
 
-# ── Shared layout from the denser (non-smoker) network ──────────────────────
-p_ref <- plot(props,
+# Use rmSingles="inboth" to define reference taxa (nodes with >=1 edge in either group)
+p_ref <- plot(props_sp,
               groupNames = c("Smoker", "Non-Smoker"),
               sameLayout = TRUE,
-              rmSingles  = FALSE,
+              rmSingles  = "inboth",
               nodeColor  = "colorVec",
               colorVec   = node_cols,
               featVecCol = phyla,
-              legendArgs = list(title = "Phylum"),
               repulsion  = 0.9,
               labelScale = FALSE,
-              cexLabels  = 0.70,
-              labelCol   = "black")
-# Build a NAMED layout matrix so node coordinates are matched by name, not index
-layout_raw <- p_ref$layout$layout1
-# layout_raw rows correspond to internal node order; assign node names as rownames
-# so the SLR network (same node names, different internal order) maps correctly
-if (is.null(rownames(layout_raw))) {
-  rownames(layout_raw) <- names(node_cols)
-}
-layout_ref <- layout_raw
+              cexLabels  = 0.70)
 
-# ── Load permApprox significant edges (FDR < 0.1) ────────────────────────────
+reference_layout <- p_ref$layout$layout1
+reference_taxa   <- rownames(reference_layout)
+message(sprintf("Reference taxa (with >=1 edge in sparse): %d of %d",
+                length(reference_taxa), length(names(node_cols))))
+
+# ── Load permApprox significant edges ─────────────────────────────────────────
 perm_file <- file.path(SPARSE, "sparse_edge_pvals.csv")
 sig_pairs <- data.frame(taxon_i=character(), taxon_j=character(), stringsAsFactors=FALSE)
 if (file.exists(perm_file)) {
   perm_df  <- read.csv(perm_file, stringsAsFactors=FALSE)
-  # Map OTU IDs in perm file back to family labels
   perm_df$label_i <- labels[as.character(perm_df$taxon_i)]
   perm_df$label_j <- labels[as.character(perm_df$taxon_j)]
   sig_rows <- perm_df[perm_df$bh_pval < 0.1, c("label_i","label_j")]
   sig_rows <- sig_rows[!is.na(sig_rows$label_i) & !is.na(sig_rows$label_j), ]
-  sig_pairs <- data.frame(taxon_i=sig_rows$label_i, taxon_j=sig_rows$label_j,
-                           stringsAsFactors=FALSE)
+  sig_pairs <- data.frame(taxon_i=sig_rows$label_i, taxon_j=sig_rows$label_j, stringsAsFactors=FALSE)
   message(sprintf("permApprox significant edges (FDR<0.1): %d", nrow(sig_pairs)))
 }
 
-make_edge_colors <- function(pcor_mat, sig_pairs,
-                              col_pos_sig="#E84646", col_neg_sig="#0072B2",
-                              col_pos="#CCCCCC",     col_neg="#BBBBBB",
-                              thresh=1e-10) {
-  taxa <- rownames(pcor_mat)
-  n    <- length(taxa)
-  cols <- c()
-  for (i in seq_len(n-1)) {
-    for (j in seq(i+1, n)) {
-      v <- pcor_mat[i,j]
-      if (abs(v) <= thresh) next
-      ti <- taxa[i]; tj <- taxa[j]
-      is_sig <- any((sig_pairs$taxon_i==ti & sig_pairs$taxon_j==tj) |
-                    (sig_pairs$taxon_i==tj & sig_pairs$taxon_j==ti))
-      cols <- c(cols, if (v > 0) (if (is_sig) col_pos_sig else col_pos)
-                      else        (if (is_sig) col_neg_sig else col_neg))
-    }
-  }
-  cols
+# ── Step 2: Sparse combined plot — reference_taxa, reference_layout ────────────
+message("Saving sparse combined network (reference taxa) ...")
+pcor_sm_ref <- pcor_sm[reference_taxa, reference_taxa]
+pcor_ns_ref <- pcor_ns[reference_taxa, reference_taxa]
+n_sm <- sum(pcor_sm_ref[upper.tri(pcor_sm_ref)] != 0)
+n_ns <- sum(pcor_ns_ref[upper.tri(pcor_ns_ref)] != 0)
+message(sprintf("Sparse edges (reference taxa): smoker=%d, non-smoker=%d", n_sm, n_ns))
+
+net_sp_ref   <- netConstruct(data=pcor_sm_ref, data2=pcor_ns_ref,
+                              dataType="condDependence", sparsMethod="none",
+                              normMethod="none", verbose=0, seed=123456)
+props_sp_ref <- netAnalyze(net_sp_ref, clustMethod="cluster_fast_greedy", verbose=FALSE)
+
+for (ext in c("png","svg")) {
+  out <- file.path(FIG_DIR, paste0("netcomi_sparse_agp_combined.", ext))
+  if (ext=="png") png(out, width=4800, height=2000, res=300)
+  else            svg(out, width=16, height=6.67)
+  plot(props_sp_ref,
+       groupNames = c(paste0("Smoker  |  ", n_sm, " edges"),
+                      paste0("Non-Smoker  |  ", n_ns, " edges")),
+       layout     = reference_layout,
+       sameLayout = TRUE,
+       rmSingles  = FALSE,
+       nodeColor  = "colorVec",
+       colorVec   = node_cols[reference_taxa],
+       featVecCol = phyla[reference_taxa],
+       repulsion  = 0.9,
+       labelScale = FALSE,
+       cexLabels  = 0.70)
+  dev.off()
+  message(sprintf("  Saved: netcomi_sparse_agp_combined.%s", ext))
 }
 
-# ── Save combined two-group plot and individual cropped panels ───────────────
-save_combined <- function(stem, group1, group2) {
-  for (ext in c("png", "svg")) {
-    out <- file.path(FIG_DIR, paste0(stem, ".", ext))
-    if (ext == "png") png(out, width = 4800, height = 2000, res = 300)
-    else               svg(out, width = 16, height = 6.67)
-    plot(props,
-         groupNames = c(paste0("Smoker  |  ", n_sm, " edges"),
-                        paste0("Non-Smoker  |  ", n_ns, " edges")),
-         sameLayout = TRUE,
-         layout     = layout_ref,
-         rmSingles  = FALSE,
-         nodeColor  = "colorVec",
-         colorVec   = node_cols,
-         featVecCol = phyla,
-         repulsion  = 0.9,
-         labelScale = FALSE,
-         cexLabels  = 0.70)
-    dev.off()
-    message(sprintf("  Saved: %s.%s", stem, ext))
-  }
-}
-
-# Individual panels: plot two-group but crop to left or right half via margins
-save_panel <- function(stem, which_group, group_label, n_edges) {
-  for (ext in c("png", "svg")) {
-    out <- file.path(FIG_DIR, paste0(stem, ".", ext))
-    if (ext == "png") png(out, width = 2400, height = 2000, res = 300)
-    else               svg(out, width = 8, height = 6.67)
-
-    gnames <- if (which_group == 1)
-      c(paste0("Sparse graphical lasso — ", group_label, "  |  ", n_edges, " edges"), "")
-    else
-      c("", paste0("Sparse graphical lasso — ", group_label, "  |  ", n_edges, " edges"))
-
-    # Use layout from the relevant group
-    lay <- if (which_group == 1) layout_ref else p_ref$layout$layout2
-
-    plot(props,
-         groupNames = gnames,
-         sameLayout = FALSE,
-         layout     = lay,
-         rmSingles  = FALSE,
-         nodeColor  = "colorVec",
-         colorVec   = node_cols,
-         featVecCol = phyla,
-         repulsion  = 0.9,
-         labelScale = FALSE,
-         cexLabels  = 0.70,
-         # Hide the unwanted panel by making it blank
-         mar        = if (which_group == 1) c(2,2,4,2) else c(2,2,4,2))
-    dev.off()
-    message(sprintf("  Saved: %s.%s", stem, ext))
-  }
-}
-
-message("Saving AGP sparse network plots ...")
-save_combined("netcomi_sparse_agp_combined", "Smoker", "Non-Smoker")
-
-# Individual panels via single-group netConstruct (workaround: pass both groups, mask titles)
-for (grp in list(list(stem="netcomi_sparse_smoker",     pcor=pcor_sm, label="Smoker",     n=n_sm),
-                 list(stem="netcomi_sparse_non_smoker",  pcor=pcor_ns, label="Non-Smoker", n=n_ns))) {
-  for (ext in c("png", "svg")) {
-    out <- file.path(FIG_DIR, paste0(grp$stem, ".", ext))
-    if (ext == "png") png(out, width = 2400, height = 2000, res = 300)
-    else               svg(out, width = 8, height = 6.67)
-    net1 <- netConstruct(data = grp$pcor, data2 = grp$pcor,
-                         dataType = "condDependence",
-                         sparsMethod = "none", normMethod = "none",
-                         verbose = 0, seed = 123456)
-    pr1  <- netAnalyze(net1, clustMethod = "cluster_fast_greedy", verbose = FALSE)
-    plot(pr1,
-         groupNames = c(paste0("Sparse graphical lasso — ", grp$label,
-                                "  |  ", grp$n, " edges"), ""),
-         sameLayout = TRUE,
-         layout     = layout_ref,
-         rmSingles  = FALSE,
-         nodeColor  = "colorVec",
-         colorVec   = node_cols,
-         featVecCol = phyla,
-         repulsion  = 0.9,
-         labelScale = FALSE,
-         cexLabels  = 0.70)
-    dev.off()
-    message(sprintf("  Saved: %s.%s", grp$stem, ext))
-  }
-}
-
-# ── Differential network (same shared layout) ────────────────────────────────
-message("Computing AGP sparse differential network ...")
-diff_net <- diffnet(net, diffMethod = "fisher", n1 = 234, n2 = 234)
-n_diff   <- sum(diff_net$diffMat != 0, na.rm = TRUE)
-message(sprintf("  Differential edges: %d", n_diff))
-
-if (n_diff > 0) {
-  diff_edge_col <- c("#CC79A7","#009E73","#0072B2","#E69F00",
-                     "#999999","#56B4E9","#F0E442","white","#B55E00")
-  for (ext in c("png", "svg")) {
-    out <- file.path(FIG_DIR, paste0("netcomi_sparse_diff_agp.", ext))
-    if (ext == "png") png(out, width = 2800, height = 2400, res = 300)
-    else               svg(out, width = 9.33, height = 8)
-    plot(diff_net,
-         layout     = layout_ref,
-         rmSingles  = FALSE,
-         mar        = c(2, 2, 5, 10),
-         edgeCol    = diff_edge_col,
-         edgeWidth  = 2.5,
-         labelScale = FALSE,
-         cexLabels  = 0.70,
-         title1     = paste0("Differential sparse network (AGP)  |  ",
-                              n_diff, " differing edges"))
-    dev.off()
-    message(sprintf("  Saved: netcomi_sparse_diff_agp.%s", ext))
-  }
-} else {
-  message("  No significant differential associations — skipping diff plot.")
-}
-
-# ── SLR network — same shared layout for direct comparison ───────────────────
-message("\n=== SLR network (same layout as sparse) ===")
+# ── Step 3: SLR combined plot — SAME reference_taxa and reference_layout ───────
+message("\n=== SLR network (same reference_taxa + reference_layout as sparse) ===")
 theta_slr_sm <- load_theta(file.path(SPARSE, "..", "slr", "py_slr_theta_smoker.csv"))
 theta_slr_ns <- load_theta(file.path(SPARSE, "..", "slr", "py_slr_theta_non_smoker.csv"))
 pcor_slr_sm  <- theta_to_pcor(theta_slr_sm)
 pcor_slr_ns  <- theta_to_pcor(theta_slr_ns)
-
-# Rename OTU IDs → family labels (same mapping used for sparse)
 slr_ids <- rownames(pcor_slr_sm)
 rownames(pcor_slr_sm) <- colnames(pcor_slr_sm) <- labels[slr_ids]
 rownames(pcor_slr_ns) <- colnames(pcor_slr_ns) <- labels[slr_ids]
 
-# Align to full 40-node superset so the shared layout applies
-pcor_slr_sm <- reindex_to_labels(pcor_slr_sm, names(node_cols))
-pcor_slr_ns <- reindex_to_labels(pcor_slr_ns, names(node_cols))
+# Subset SLR to exactly the same reference_taxa
+pcor_slr_sm_ref <- pcor_slr_sm[reference_taxa, reference_taxa]
+pcor_slr_ns_ref <- pcor_slr_ns[reference_taxa, reference_taxa]
+n_slr_sm <- sum(pcor_slr_sm_ref[upper.tri(pcor_slr_sm_ref)] != 0)
+n_slr_ns <- sum(pcor_slr_ns_ref[upper.tri(pcor_slr_ns_ref)] != 0)
+message(sprintf("SLR edges (reference taxa): smoker=%d, non-smoker=%d", n_slr_sm, n_slr_ns))
 
-n_slr_sm <- sum(pcor_slr_sm[upper.tri(pcor_slr_sm)] != 0)
-n_slr_ns <- sum(pcor_slr_ns[upper.tri(pcor_slr_ns)] != 0)
-message(sprintf("SLR edges: smoker=%d, non-smoker=%d", n_slr_sm, n_slr_ns))
+net_slr_ref   <- netConstruct(data=pcor_slr_sm_ref, data2=pcor_slr_ns_ref,
+                               dataType="condDependence", sparsMethod="none",
+                               normMethod="none", verbose=0, seed=123456)
+props_slr_ref <- netAnalyze(net_slr_ref, clustMethod="cluster_fast_greedy", verbose=FALSE)
 
-net_slr   <- netConstruct(data=pcor_slr_sm, data2=pcor_slr_ns,
-                           dataType="condDependence", sparsMethod="none",
-                           normMethod="none", verbose=0, seed=123456)
-props_slr <- netAnalyze(net_slr, clustMethod="cluster_fast_greedy", verbose=FALSE)
-
-message("Saving AGP SLR combined network plot ...")
 for (ext in c("png","svg")) {
   out <- file.path(FIG_DIR, paste0("netcomi_slr_agp_combined.", ext))
   if (ext=="png") png(out, width=4800, height=2000, res=300)
   else            svg(out, width=16, height=6.67)
-  plot(props_slr,
+  plot(props_slr_ref,
        groupNames = c(paste0("SLR: Smoker  |  ", n_slr_sm, " edges"),
                       paste0("SLR: Non-Smoker  |  ", n_slr_ns, " edges")),
+       layout     = reference_layout,
        sameLayout = TRUE,
-       layout     = layout_ref,
        rmSingles  = FALSE,
        nodeColor  = "colorVec",
-       colorVec   = node_cols,
-       featVecCol = phyla,
+       colorVec   = node_cols[reference_taxa],
+       featVecCol = phyla[reference_taxa],
        repulsion  = 0.9,
        labelScale = FALSE,
        cexLabels  = 0.70)
@@ -317,4 +197,23 @@ for (ext in c("png","svg")) {
   message(sprintf("  Saved: netcomi_slr_agp_combined.%s", ext))
 }
 
-message("AGP sparse NetCoMi plots done.")
+# ── Differential network (same reference layout) ──────────────────────────────
+message("\nComputing AGP sparse differential network ...")
+diff_net <- diffnet(net_sp_ref, diffMethod="fisher", n1=234, n2=234)
+n_diff   <- sum(diff_net$diffMat != 0, na.rm=TRUE)
+if (n_diff > 0) {
+  diff_edge_col <- c("#CC79A7","#009E73","#0072B2","#E69F00","#999999","#56B4E9","#F0E442","white","#B55E00")
+  for (ext in c("png","svg")) {
+    out <- file.path(FIG_DIR, paste0("netcomi_sparse_diff_agp.", ext))
+    if (ext=="png") png(out, width=2800, height=2400, res=300)
+    else            svg(out, width=9.33, height=8)
+    plot(diff_net, layout=reference_layout, rmSingles=FALSE,
+         mar=c(2,2,5,10), edgeCol=diff_edge_col, edgeWidth=2.5,
+         labelScale=FALSE, cexLabels=0.70,
+         title1=paste0("Differential sparse network (AGP)  |  ", n_diff, " differing edges"))
+    dev.off()
+    message(sprintf("  Saved: netcomi_sparse_diff_agp.%s", ext))
+  }
+}
+
+message("AGP sparse + SLR NetCoMi plots done.")
