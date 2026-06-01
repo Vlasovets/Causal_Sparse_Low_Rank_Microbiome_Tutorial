@@ -192,4 +192,34 @@ for (grp in list(list(stem="netcomi_sparse_smoker",     pcor=pcor_sm, label="Smo
   }
 }
 
+# ── Differential network (same shared layout) ────────────────────────────────
+message("Computing AGP sparse differential network ...")
+diff_net <- diffnet(net, diffMethod = "fisher", n1 = 234, n2 = 234)
+n_diff   <- sum(diff_net$diffMat != 0, na.rm = TRUE)
+message(sprintf("  Differential edges: %d", n_diff))
+
+if (n_diff > 0) {
+  diff_edge_col <- c("#CC79A7","#009E73","#0072B2","#E69F00",
+                     "#999999","#56B4E9","#F0E442","white","#B55E00")
+  for (ext in c("png", "svg")) {
+    out <- file.path(FIG_DIR, paste0("netcomi_sparse_diff_agp.", ext))
+    if (ext == "png") png(out, width = 2800, height = 2400, res = 300)
+    else               svg(out, width = 9.33, height = 8)
+    plot(diff_net,
+         layout     = layout_ref,
+         rmSingles  = FALSE,
+         mar        = c(2, 2, 5, 10),
+         edgeCol    = diff_edge_col,
+         edgeWidth  = 2.5,
+         labelScale = FALSE,
+         cexLabels  = 0.70,
+         title1     = paste0("Differential sparse network (AGP)  |  ",
+                              n_diff, " differing edges"))
+    dev.off()
+    message(sprintf("  Saved: netcomi_sparse_diff_agp.%s", ext))
+  }
+} else {
+  message("  No significant differential associations — skipping diff plot.")
+}
+
 message("AGP sparse NetCoMi plots done.")
