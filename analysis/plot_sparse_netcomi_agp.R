@@ -271,7 +271,12 @@ theta_slr_ns <- load_theta(file.path(SPARSE, "..", "slr", "py_slr_theta_non_smok
 pcor_slr_sm  <- theta_to_pcor(theta_slr_sm)
 pcor_slr_ns  <- theta_to_pcor(theta_slr_ns)
 
-# Align to same superset as sparse (so shared layout applies)
+# Rename OTU IDs → family labels (same mapping used for sparse)
+slr_ids <- rownames(pcor_slr_sm)
+rownames(pcor_slr_sm) <- colnames(pcor_slr_sm) <- labels[slr_ids]
+rownames(pcor_slr_ns) <- colnames(pcor_slr_ns) <- labels[slr_ids]
+
+# Align to full 40-node superset so the shared layout applies
 pcor_slr_sm <- reindex_to_labels(pcor_slr_sm, names(node_cols))
 pcor_slr_ns <- reindex_to_labels(pcor_slr_ns, names(node_cols))
 
