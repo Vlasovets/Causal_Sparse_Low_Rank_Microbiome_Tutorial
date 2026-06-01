@@ -11,11 +11,11 @@
 #   netcomi_sparse_non_smoker.png / .svg
 
 suppressPackageStartupMessages({ library(NetCoMi) })
-source(file.path(dirname(sys.frame(1)$ofile), "phylum_palette.R"), local=TRUE)
 
 args        <- commandArgs(trailingOnly = FALSE)
 script_file <- sub("--file=", "", args[grep("--file=", args)])
 ROOT        <- normalizePath(file.path(dirname(script_file), ".."))
+source(file.path(ROOT, "analysis", "phylum_palette.R"), local=TRUE)
 
 SRC_AG  <- file.path(ROOT, "source", "design_AG")
 SPARSE  <- file.path(ROOT, "results", "two_group", "sparse")
