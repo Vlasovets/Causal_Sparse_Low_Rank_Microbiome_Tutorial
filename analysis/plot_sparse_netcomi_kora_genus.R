@@ -67,13 +67,9 @@ get_phylum <- function(name) {
 phyla <- setNames(sapply(taxa_names, get_phylum), taxa_names)
 message(sprintf("Phyla found: %s", paste(sort(unique(phyla)), collapse=", ")))
 
-pal <- c("#88CCEE","#CC6677","#DDCC77","#117733","#332288",
-         "#AA4499","#44AA99","#999933","#882255","#661100",
-         "#6699CC","#888888","#E69F00","#D55E00","#0072B2")
-unique_phyla <- sort(unique(phyla))
-phy_cols     <- setNames(pal[seq_along(unique_phyla)], unique_phyla)
-node_cols    <- phy_cols[phyla]
-names(node_cols) <- taxa_names
+# Use shared fixed palette for cross-dataset colour consistency
+source(file.path(ROOT, "analysis", "phylum_palette.R"), local=TRUE)
+node_cols <- setNames(sapply(phyla, phylum_colour), taxa_names)
 
 # ── Build NetCoMi networks ──────────────────────────────────────────────────
 message("Constructing KORA genus sparse networks ...")

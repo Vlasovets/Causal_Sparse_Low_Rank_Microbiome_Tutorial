@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=sparse_netcomi
 #SBATCH --partition=cpu_p
-#SBATCH --qos=cpu_preemptible
+#SBATCH --qos=cpu_normal
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=8G
 #SBATCH --time=0:30:00

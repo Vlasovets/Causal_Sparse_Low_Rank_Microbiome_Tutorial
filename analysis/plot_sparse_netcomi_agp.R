@@ -11,6 +11,7 @@
 #   netcomi_sparse_non_smoker.png / .svg
 
 suppressPackageStartupMessages({ library(NetCoMi) })
+source(file.path(dirname(sys.frame(1)$ofile), "phylum_palette.R"), local=TRUE)
 
 args        <- commandArgs(trailingOnly = FALSE)
 script_file <- sub("--file=", "", args[grep("--file=", args)])
@@ -69,13 +70,9 @@ phyla <- setNames(sapply(taxa_ids, function(id) {
 rownames(pcor_sm) <- colnames(pcor_sm) <- labels[taxa_ids]
 rownames(pcor_ns) <- colnames(pcor_ns) <- labels[taxa_ids]
 
-pal <- c("#88CCEE","#CC6677","#DDCC77","#117733","#332288",
-         "#AA4499","#44AA99","#999933","#882255","#661100",
-         "#6699CC","#888888","#E69F00")
-unique_phyla <- sort(unique(phyla))
-phy_cols     <- setNames(pal[seq_along(unique_phyla)], unique_phyla)
-node_cols    <- phy_cols[phyla]
-names(node_cols) <- names(phyla)
+# Use shared fixed palette (phylum_palette.R) for cross-dataset colour consistency
+node_cols <- setNames(sapply(phyla, phylum_colour), names(phyla))
+message(sprintf("AGP phyla: %s", paste(sort(unique(phyla)), collapse=", ")))
 
 # ── NetCoMi ─────────────────────────────────────────────────────────────────
 message("Constructing networks ...")
