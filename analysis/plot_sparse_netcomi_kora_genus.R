@@ -47,16 +47,25 @@ message(sprintf("KORA genus sparse edges: smoker=%d, non-smoker=%d", n_sm, n_ns)
 
 # ── Taxonomy ────────────────────────────────────────────────────────────────
 taxa_names <- rownames(theta_sm)
-tax        <- read.csv(TAX_F, row.names = 1, stringsAsFactors = FALSE)
+
+# Use full taxonomy to map genus → phylum (KORA tax_table.csv has family-level rows,
+# so we use taxonomy_clean.csv from KORA_data which has genus-level entries)
+tax_full <- read.csv(
+  file.path(KORA_ROOT, "..", "KORA_data", "taxonomy_clean.csv"),
+  row.names = 1, stringsAsFactors = FALSE)
+tax_full$genus_clean <- sub("^g__", "", sub(";.*", "", tax_full$genus))
+tax_full$phylum_clean <- sub("^p__", "", sub(";.*", "", tax_full$phylum))
 
 get_phylum <- function(name) {
-  if (name %in% rownames(tax)) {
-    ph <- tax[name, "Phylum"]
+  idx <- which(tax_full$genus_clean == name)
+  if (length(idx) > 0) {
+    ph <- unique(tax_full$phylum_clean[idx])[1]
     if (!is.na(ph) && nchar(ph) > 1) return(ph)
   }
   "Unknown"
 }
 phyla <- setNames(sapply(taxa_names, get_phylum), taxa_names)
+message(sprintf("Phyla found: %s", paste(sort(unique(phyla)), collapse=", ")))
 
 pal <- c("#88CCEE","#CC6677","#DDCC77","#117733","#332288",
          "#AA4499","#44AA99","#999933","#882255","#661100",
@@ -122,6 +131,40 @@ net_hub <- netConstruct(data     = pcor_sm_hub,
                         seed        = 123456)
 props_hub <- netAnalyze(net_hub, clustMethod = "cluster_fast_greedy",
                         verbose = FALSE)
+
+# ── Load permApprox significant edges (FDR < 0.1) ────────────────────────────
+perm_file <- file.path(SPARSE, "sparse_perm_edge_pvals.csv")
+sig_pairs <- data.frame(taxon_i=character(), taxon_j=character(), stringsAsFactors=FALSE)
+if (file.exists(perm_file)) {
+  perm_df  <- read.csv(perm_file, stringsAsFactors=FALSE)
+  sig_rows <- perm_df[perm_df$bh_pval < 0.1, c("taxon_i","taxon_j")]
+  sig_pairs <- sig_rows
+  message(sprintf("permApprox significant edges (FDR<0.1): %d", nrow(sig_pairs)))
+}
+
+# Build edge-colour vector for hub subgraph: highlight permApprox-sig edges
+make_edge_colors <- function(pcor_mat, sig_pairs,
+                              col_pos_sig="#E84646", col_neg_sig="#0072B2",
+                              col_pos="#BBBBBB",     col_neg="#AAAAAA",
+                              thresh=1e-10) {
+  taxa <- rownames(pcor_mat)
+  n    <- length(taxa)
+  cols <- c()
+  for (i in seq_len(n-1)) {
+    for (j in seq(i+1, n)) {
+      v <- pcor_mat[i,j]
+      if (abs(v) <= thresh) next
+      ti <- taxa[i]; tj <- taxa[j]
+      is_sig <- any((sig_pairs$taxon_i==ti & sig_pairs$taxon_j==tj) |
+                    (sig_pairs$taxon_i==tj & sig_pairs$taxon_j==ti))
+      cols <- c(cols, if (v > 0) (if (is_sig) col_pos_sig else col_pos)
+                      else        (if (is_sig) col_neg_sig else col_neg))
+    }
+  }
+  cols
+}
+edge_cols_sm  <- make_edge_colors(pcor_sm_hub, sig_pairs)
+edge_cols_ns  <- make_edge_colors(pcor_ns_hub, sig_pairs)
 
 message("Saving KORA genus sparse hub-only combined plot ...")
 for (ext in c("png", "svg")) {

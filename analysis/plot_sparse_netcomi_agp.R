@@ -104,6 +104,42 @@ p_ref <- plot(props,
               labelCol   = "black")
 layout_ref <- p_ref$layout$layout1
 
+# ── Load permApprox significant edges (FDR < 0.1) ────────────────────────────
+perm_file <- file.path(SPARSE, "sparse_edge_pvals.csv")
+sig_pairs <- data.frame(taxon_i=character(), taxon_j=character(), stringsAsFactors=FALSE)
+if (file.exists(perm_file)) {
+  perm_df  <- read.csv(perm_file, stringsAsFactors=FALSE)
+  # Map OTU IDs in perm file back to family labels
+  perm_df$label_i <- labels[as.character(perm_df$taxon_i)]
+  perm_df$label_j <- labels[as.character(perm_df$taxon_j)]
+  sig_rows <- perm_df[perm_df$bh_pval < 0.1, c("label_i","label_j")]
+  sig_rows <- sig_rows[!is.na(sig_rows$label_i) & !is.na(sig_rows$label_j), ]
+  sig_pairs <- data.frame(taxon_i=sig_rows$label_i, taxon_j=sig_rows$label_j,
+                           stringsAsFactors=FALSE)
+  message(sprintf("permApprox significant edges (FDR<0.1): %d", nrow(sig_pairs)))
+}
+
+make_edge_colors <- function(pcor_mat, sig_pairs,
+                              col_pos_sig="#E84646", col_neg_sig="#0072B2",
+                              col_pos="#CCCCCC",     col_neg="#BBBBBB",
+                              thresh=1e-10) {
+  taxa <- rownames(pcor_mat)
+  n    <- length(taxa)
+  cols <- c()
+  for (i in seq_len(n-1)) {
+    for (j in seq(i+1, n)) {
+      v <- pcor_mat[i,j]
+      if (abs(v) <= thresh) next
+      ti <- taxa[i]; tj <- taxa[j]
+      is_sig <- any((sig_pairs$taxon_i==ti & sig_pairs$taxon_j==tj) |
+                    (sig_pairs$taxon_i==tj & sig_pairs$taxon_j==ti))
+      cols <- c(cols, if (v > 0) (if (is_sig) col_pos_sig else col_pos)
+                      else        (if (is_sig) col_neg_sig else col_neg))
+    }
+  }
+  cols
+}
+
 # ── Save combined two-group plot and individual cropped panels ───────────────
 save_combined <- function(stem, group1, group2) {
   for (ext in c("png", "svg")) {
