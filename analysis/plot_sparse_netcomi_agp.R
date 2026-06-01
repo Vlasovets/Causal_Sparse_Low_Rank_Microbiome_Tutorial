@@ -92,11 +92,11 @@ net_sp <- netConstruct(data = pcor_sm, data2 = pcor_ns,
                        verbose = 0, seed = 123456)
 props_sp <- netAnalyze(net_sp, clustMethod = "cluster_fast_greedy", verbose = FALSE)
 
-# Use rmSingles="inboth" to define reference taxa (nodes with >=1 edge in either group)
+# Use rmSingles=FALSE: all 40 nodes get layout positions; SLR uses same full node set
 p_ref <- plot(props_sp,
               groupNames = c("Smoker", "Non-Smoker"),
               sameLayout = TRUE,
-              rmSingles  = "inboth",
+              rmSingles  = FALSE,
               nodeColor  = "colorVec",
               colorVec   = node_cols,
               featVecCol = phyla,
