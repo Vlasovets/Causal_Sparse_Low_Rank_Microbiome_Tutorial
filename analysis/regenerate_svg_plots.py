@@ -158,19 +158,23 @@ df['reject_lee'] = df['q_lee'] < 0.1
 df = df.sort_values('lfc')
 print(f"  BH q<0.1: {df['reject_bh'].sum()}  Lee q<0.1: {df['reject_lee'].sum()}")
 
-C_SIG_HIGH = "#E84646"
-C_SIG_MID  = "#9B59B6"
-C_NONSIG   = "#AAAAAA"
+C_SIG_STRICT = "#C0392B"
+C_SIG_HIGH   = "#E84646"
+C_SIG_MID    = "#9B59B6"
+C_NONSIG     = "#AAAAAA"
 
-def kora_volcano(ax, df, pval_col, qval_col, title, alpha=0.1, alpha2=0.2):
+def kora_volcano(ax, df, pval_col, qval_col, title, alpha0=0.05, alpha=0.1, alpha2=0.2):
     x = df["lfc"]
     y = -np.log10(df[pval_col].clip(lower=1e-10))
     q = df[qval_col]
-    colors = [C_SIG_HIGH if qi < alpha else (C_SIG_MID if qi < alpha2 else C_NONSIG)
+    colors = [C_SIG_STRICT if qi < alpha0
+              else (C_SIG_HIGH if qi < alpha
+              else (C_SIG_MID  if qi < alpha2 else C_NONSIG))
               for qi in q]
     ax.scatter(x, y, c=colors, s=50, alpha=0.8, edgecolors="none")
-    ax.axhline(-np.log10(alpha),  color="black",   lw=1,   ls="--", alpha=0.5)
-    ax.axhline(-np.log10(alpha2), color=C_SIG_MID, lw=0.8, ls=":",  alpha=0.6)
+    ax.axhline(-np.log10(alpha0), color=C_SIG_STRICT, lw=0.8, ls="--", alpha=0.7)
+    ax.axhline(-np.log10(alpha),  color="black",       lw=1,   ls="--", alpha=0.5)
+    ax.axhline(-np.log10(alpha2), color=C_SIG_MID,     lw=0.8, ls=":",  alpha=0.6)
     ax.axvline(0, color="black", lw=0.8, alpha=0.4)
     y_clipped = -np.log10(df[pval_col].clip(lower=1e-10))
     for idx, row in df[q < alpha2].iterrows():
@@ -183,9 +187,10 @@ def kora_volcano(ax, df, pval_col, qval_col, title, alpha=0.1, alpha2=0.2):
     ax.set_ylabel("−log₁₀(p-value)", fontsize=10)
     ax.set_title(title, fontsize=10)
     ax.legend(handles=[
-        mpatches.Patch(color=C_SIG_HIGH, label=f"q < {alpha}"),
-        mpatches.Patch(color=C_SIG_MID,  label=f"{alpha} ≤ q < {alpha2}"),
-        mpatches.Patch(color=C_NONSIG,   label=f"q ≥ {alpha2}"),
+        mpatches.Patch(color=C_SIG_STRICT, label=f"q < {alpha0}"),
+        mpatches.Patch(color=C_SIG_HIGH,   label=f"{alpha0} ≤ q < {alpha}"),
+        mpatches.Patch(color=C_SIG_MID,    label=f"{alpha} ≤ q < {alpha2}"),
+        mpatches.Patch(color=C_NONSIG,     label=f"q ≥ {alpha2}"),
     ], fontsize=8)
     ax.spines[["top","right"]].set_visible(False)
 

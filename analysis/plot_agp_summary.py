@@ -28,11 +28,12 @@ SVG_DIR   = os.path.join(REPO_ROOT, "plots", "svg")
 for d in (PNG_DIR, SVG_DIR): os.makedirs(d, exist_ok=True)
 
 # ── Colour palette (matches chapter-5 convention) ────────────────────────────
-C_SMOKER   = "#E84646"   # red
-C_NEVER    = "#4C9BE8"   # blue
-C_SIG_HIGH = "#E84646"   # red    — q < 0.1
-C_SIG_MID  = "#9B59B6"   # purple — 0.1 ≤ q < 0.2
-C_NONSIG   = "#AAAAAA"   # gray   — q ≥ 0.2
+C_SMOKER      = "#E84646"   # red
+C_NEVER       = "#4C9BE8"   # blue
+C_SIG_STRICT  = "#C0392B"   # dark red — q < 0.05
+C_SIG_HIGH    = "#E84646"   # red      — 0.05 ≤ q < 0.1
+C_SIG_MID     = "#9B59B6"   # purple   — 0.1 ≤ q < 0.2
+C_NONSIG      = "#AAAAAA"   # gray     — q ≥ 0.2
 
 def save(fig, name):
     fig.savefig(os.path.join(PNG_DIR, f"{name}.png"), dpi=300, bbox_inches="tight")
@@ -147,18 +148,23 @@ save(fig, "agp_richness_boxplot")
 # ═══════════════════════════════════════════════════════════════════════════════
 print("\n=== 3. Volcano plots ===")
 
-def volcano(ax, df, pval_col, qval_col, title, alpha=0.1, alpha2=0.2):
+def volcano(ax, df, pval_col, qval_col, title, alpha0=0.05, alpha=0.1, alpha2=0.2):
     x = df["lfc"]
     y = -np.log10(df[pval_col].clip(lower=1e-10))
     q = df[qval_col]
-    colors = [C_SIG_HIGH if qi < alpha else (C_SIG_MID if qi < alpha2 else C_NONSIG)
+    colors = [C_SIG_STRICT if qi < alpha0
+              else (C_SIG_HIGH if qi < alpha
+              else (C_SIG_MID  if qi < alpha2 else C_NONSIG))
               for qi in q]
     ax.scatter(x, y, c=colors, s=50, alpha=0.8, edgecolors="none")
-    ax.axhline(-np.log10(alpha),  color="black",   lw=1,   ls="--", alpha=0.5)
-    ax.axhline(-np.log10(alpha2), color=C_SIG_MID, lw=0.8, ls=":",  alpha=0.6)
+    ax.axhline(-np.log10(alpha0), color=C_SIG_STRICT, lw=0.8, ls="--", alpha=0.7)
+    ax.axhline(-np.log10(alpha),  color="black",       lw=1,   ls="--", alpha=0.5)
+    ax.axhline(-np.log10(alpha2), color=C_SIG_MID,     lw=0.8, ls=":",  alpha=0.6)
     ax.axvline(0, color="black", lw=0.8, alpha=0.4)
+    y_clipped = -np.log10(df[pval_col].clip(lower=1e-10))
     for idx, row in df[q < alpha2].iterrows():
-        ax.annotate(idx, xy=(row["lfc"], -np.log10(row[pval_col])),
+        yi = float(y_clipped.loc[idx])
+        ax.annotate(idx, xy=(row["lfc"], yi),
                     fontsize=6.5, ha="left" if row["lfc"] > 0 else "right",
                     xytext=(3 if row["lfc"] > 0 else -3, 2),
                     textcoords="offset points")
@@ -166,9 +172,10 @@ def volcano(ax, df, pval_col, qval_col, title, alpha=0.1, alpha2=0.2):
     ax.set_ylabel("−log₁₀(p-value)", fontsize=10)
     ax.set_title(title, fontsize=10)
     ax.legend(handles=[
-        mpatches.Patch(color=C_SIG_HIGH, label=f"q < {alpha}"),
-        mpatches.Patch(color=C_SIG_MID,  label=f"{alpha} ≤ q < {alpha2}"),
-        mpatches.Patch(color=C_NONSIG,   label=f"q ≥ {alpha2}"),
+        mpatches.Patch(color=C_SIG_STRICT, label=f"q < {alpha0}"),
+        mpatches.Patch(color=C_SIG_HIGH,   label=f"{alpha0} ≤ q < {alpha}"),
+        mpatches.Patch(color=C_SIG_MID,    label=f"{alpha} ≤ q < {alpha2}"),
+        mpatches.Patch(color=C_NONSIG,     label=f"q ≥ {alpha2}"),
     ], fontsize=8)
     ax.spines[["top","right"]].set_visible(False)
 
