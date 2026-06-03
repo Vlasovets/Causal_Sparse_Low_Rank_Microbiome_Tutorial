@@ -22,8 +22,9 @@ from rpy2.robjects.packages import importr
 from rpy2.robjects.conversion import localconverter
 import rpy2.robjects.pandas2ri as pandas2ri
 
-REPO_ROOT  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-KORA_ROOT  = os.path.normpath(os.path.join(REPO_ROOT, '..', 'KORA_Smoking_SLR'))
+REPO_ROOT  = '/home/itg/oleg.vlasovets/slr_example/Causal_Sparse_Low_Rank_Microbiome_Tutorial'
+sys.path.insert(0, REPO_ROOT)   # must be set before any utils import
+KORA_ROOT  = '/home/itg/oleg.vlasovets/slr_example/KORA_Smoking_SLR'
 SRC        = os.path.join(KORA_ROOT, 'source')
 OUT_DIR    = os.path.join(REPO_ROOT, 'results', 'kora', 'svg_exports')
 THESIS_FIG = '/home/itg/oleg.vlasovets/thesis/figures/causality'
