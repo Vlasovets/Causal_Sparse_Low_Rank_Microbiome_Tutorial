@@ -26,7 +26,7 @@ REPO_ROOT  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 KORA_ROOT  = os.path.normpath(os.path.join(REPO_ROOT, '..', 'KORA_Smoking_SLR'))
 SRC        = os.path.join(KORA_ROOT, 'source')
 OUT_DIR    = os.path.join(REPO_ROOT, 'results', 'kora', 'svg_exports')
-THESIS_FIG = os.path.join(REPO_ROOT, '..', '..', '..', 'thesis', 'figures', 'causality')
+THESIS_FIG = '/home/itg/oleg.vlasovets/thesis/figures/causality'
 os.makedirs(OUT_DIR, exist_ok=True)
 
 def r_to_pandas(r_df):
