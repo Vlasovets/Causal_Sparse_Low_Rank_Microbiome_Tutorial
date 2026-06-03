@@ -232,10 +232,15 @@ int_val    = float(refit_beta[0]) if has_int else 0.0
 coef_vals  = refit_beta[1:][sel_idx] if has_int else refit_beta[sel_idx]
 print(f"  Selected (P≥0.65): {sel_fams}  sum={sum(coef_vals):.6f}")
 
-MCR_CV  = 1 - (np.sign(X_te @ np.array(sol.CV.beta).reshape(-1))
-               .clip(-1,-1) == y_te).mean()  # approximate
-MCR_sel = np.mean(np.sign(X_te @ refit_beta[1:].reshape(-1,1)).flatten() != y_te) \
-          if has_int and n_sel > 0 else 0.5
+def add_intercept(X): return np.hstack([np.ones((X.shape[0],1)), X])
+
+beta_cv = np.array(sol.CV.beta).reshape(-1) if sol.CV.beta is not None else np.zeros(X_te.shape[1])
+X_te_cv = add_intercept(X_te) if len(beta_cv) == X_te.shape[1]+1 else X_te
+MCR_CV  = float(np.mean(np.sign(X_te_cv @ beta_cv) != y_te))
+
+X_te_sel = add_intercept(X_te) if has_int else X_te
+MCR_sel  = float(np.mean(np.sign(X_te_sel @ refit_beta.reshape(-1)) != y_te)) \
+           if has_int and n_sel > 0 else 0.5
 
 C_SEL  = '#F08080'; C_NOSEL = '#5C4B8A'; C_COEF = '#2C3E6B'
 fig, (ax_a, ax_b) = plt.subplots(2, 1,
