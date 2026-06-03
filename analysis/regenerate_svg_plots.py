@@ -172,8 +172,10 @@ def kora_volcano(ax, df, pval_col, qval_col, title, alpha=0.1, alpha2=0.2):
     ax.axhline(-np.log10(alpha),  color="black",   lw=1,   ls="--", alpha=0.5)
     ax.axhline(-np.log10(alpha2), color=C_SIG_MID, lw=0.8, ls=":",  alpha=0.6)
     ax.axvline(0, color="black", lw=0.8, alpha=0.4)
+    y_clipped = -np.log10(df[pval_col].clip(lower=1e-10))
     for idx, row in df[q < alpha2].iterrows():
-        ax.annotate(idx, xy=(row["lfc"], -np.log10(row[pval_col])),
+        yi = float(y_clipped.loc[idx])
+        ax.annotate(idx, xy=(row["lfc"], yi),
                     fontsize=6.5, ha="left" if row["lfc"] > 0 else "right",
                     xytext=(3 if row["lfc"] > 0 else -3, 2),
                     textcoords="offset points")
