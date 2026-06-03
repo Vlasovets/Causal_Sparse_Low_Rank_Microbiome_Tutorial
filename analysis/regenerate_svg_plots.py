@@ -167,9 +167,9 @@ def da_panel(ax, df, reject_col, title, threshold=0.1):
     sig_n = df[reject_col].sum()
     ax.set_title(f'{title}  (n={sig_n} sig., q<{threshold})', fontsize=9)
     ax.spines[['top','right']].set_visible(False)
-    ax.add_patch(mpatches.Patch(color='#E84646', label=f'q < {threshold}'))
-    ax.add_patch(mpatches.Patch(color='#AAAAAA', label=f'q ≥ {threshold}'))
-    ax.legend(fontsize=7, loc='lower right')
+    ax.legend(handles=[mpatches.Rectangle((0,0),1,1, color='#E84646', label=f'q < {threshold}'),
+                       mpatches.Rectangle((0,0),1,1, color='#AAAAAA', label=f'q ≥ {threshold}')],
+              fontsize=7, loc='lower right')
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, max(5, len(df)*0.28)),
                                 sharey=True)
