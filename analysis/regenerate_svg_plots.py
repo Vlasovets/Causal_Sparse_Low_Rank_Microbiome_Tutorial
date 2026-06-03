@@ -183,9 +183,6 @@ save(fig, 'da_family_smoking')
 # 3. SMOKING CLASSIFICATION
 # ═══════════════════════════════════════════════════════════════════════════════
 print("\n=== 3. smoking_classification ===")
-sys.path.insert(0, os.path.join(REPO_ROOT, 'analysis'))
-from phylum_palette import PHYLUM_PALETTE   # noqa: already sourced
-
 # Load taxonomy for KORA families
 tax_f = os.path.join(SRC, 'tax_table.csv')
 tax   = pd.read_csv(tax_f, index_col=0) if os.path.exists(tax_f) else pd.DataFrame()
