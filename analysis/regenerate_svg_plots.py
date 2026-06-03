@@ -122,10 +122,11 @@ lo  = linda.linda(r_otu, r_w, formula='~w', alpha=0.05, prev_cut=0.0, lib_cut=1)
 out = r_to_pd(lo.rx2('output').rx2('w'))
 
 df = pd.DataFrame({
-    'family':  out.index,
-    'lfc':     out['log2FoldChange'].values,
-    'lfcSE':   out['lfcSE'].values,
-    'padj_bh': out['padj'].values,
+    'family':    out.index,
+    'lfc':       out['log2FoldChange'].values,
+    'lfcSE':     out['lfcSE'].values,
+    'pvalue':    out['pvalue'].values,
+    'padj_bh':   out['padj'].values,
     'reject_bh': out['reject'].values,
 }).set_index('family').sort_values('lfc')
 
@@ -152,30 +153,46 @@ pval_lee = calculate_unadjusted_p_values(perm_df, obs_stat, test_type='two-sided
 min_p    = min_unadjusted_p_values(perm_df)
 adj_p    = adjusted_p_values(min_p, pval_lee.reset_index(drop=True))
 df['q_lee'] = pd.Series(adj_p, index=pval_lee.index).reindex(df.index).values
+df['p_perm'] = pval_lee.reindex(df.index).values
 df['reject_lee'] = df['q_lee'] < 0.1
 df = df.sort_values('lfc')
 print(f"  BH q<0.1: {df['reject_bh'].sum()}  Lee q<0.1: {df['reject_lee'].sum()}")
 
-def da_panel(ax, df, reject_col, title, threshold=0.1):
-    colors = ['#E84646' if r else '#AAAAAA' for r in df[reject_col]]
-    ax.barh(range(len(df)), df['lfc'], xerr=df['lfcSE'],
-            color=colors, error_kw=dict(ecolor='black', capsize=2, lw=0.8))
-    ax.axvline(0, color='black', lw=0.8)
-    ax.set_yticks(range(len(df)))
-    ax.set_yticklabels(df.index, fontsize=7)
-    ax.set_xlabel('Log₂ fold change', fontsize=9)
-    sig_n = df[reject_col].sum()
-    ax.set_title(f'{title}  (n={sig_n} sig., q<{threshold})', fontsize=9)
-    ax.spines[['top','right']].set_visible(False)
-    ax.legend(handles=[mpatches.Rectangle((0,0),1,1, color='#E84646', label=f'q < {threshold}'),
-                       mpatches.Rectangle((0,0),1,1, color='#AAAAAA', label=f'q ≥ {threshold}')],
-              fontsize=7, loc='lower right')
+C_SIG_HIGH = "#E84646"
+C_SIG_MID  = "#9B59B6"
+C_NONSIG   = "#AAAAAA"
 
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, max(5, len(df)*0.28)),
-                                sharey=True)
+def kora_volcano(ax, df, pval_col, qval_col, title, alpha=0.1, alpha2=0.2):
+    x = df["lfc"]
+    y = -np.log10(df[pval_col].clip(lower=1e-10))
+    q = df[qval_col]
+    colors = [C_SIG_HIGH if qi < alpha else (C_SIG_MID if qi < alpha2 else C_NONSIG)
+              for qi in q]
+    ax.scatter(x, y, c=colors, s=50, alpha=0.8, edgecolors="none")
+    ax.axhline(-np.log10(alpha),  color="black",   lw=1,   ls="--", alpha=0.5)
+    ax.axhline(-np.log10(alpha2), color=C_SIG_MID, lw=0.8, ls=":",  alpha=0.6)
+    ax.axvline(0, color="black", lw=0.8, alpha=0.4)
+    for idx, row in df[q < alpha2].iterrows():
+        ax.annotate(idx, xy=(row["lfc"], -np.log10(row[pval_col])),
+                    fontsize=6.5, ha="left" if row["lfc"] > 0 else "right",
+                    xytext=(3 if row["lfc"] > 0 else -3, 2),
+                    textcoords="offset points")
+    ax.set_xlabel("Log₂ fold change (smoker vs never-smoker)", fontsize=10)
+    ax.set_ylabel("−log₁₀(p-value)", fontsize=10)
+    ax.set_title(title, fontsize=10)
+    ax.legend(handles=[
+        mpatches.Patch(color=C_SIG_HIGH, label=f"q < {alpha}"),
+        mpatches.Patch(color=C_SIG_MID,  label=f"{alpha} ≤ q < {alpha2}"),
+        mpatches.Patch(color=C_NONSIG,   label=f"q ≥ {alpha2}"),
+    ], fontsize=8)
+    ax.spines[["top","right"]].set_visible(False)
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5))
 fig.suptitle("KORA FF4: Differential abundance at family level (LinDA)", fontsize=11)
-da_panel(ax1, df, 'reject_bh',  '(a) BH correction')
-da_panel(ax2, df, 'reject_lee', '(b) Lee et al. correction')
+kora_volcano(ax1, df, "pvalue",  "padj_bh",
+             f"(a) BH correction  (n={df['reject_bh'].sum()} sig.)")
+kora_volcano(ax2, df, "p_perm",  "q_lee",
+             f"(b) Lee et al. correction  (n={df['reject_lee'].sum()} sig.)")
 plt.tight_layout()
 save(fig, 'da_family_smoking')
 
